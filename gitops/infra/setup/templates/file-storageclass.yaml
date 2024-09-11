@@ -1,0 +1,22 @@
+{{- if .Values.storageclass.create -}}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Values.storageaccount.file.sc_name }}
+  annotations:
+    storageclass.kubernetes.io/is-default-class: 'true'
+parameters:
+  resourceGroup: {{ .Values.storageaccount.file.resourcegroup }}
+  server: {{ .Values.storageaccount.file.storageaccountname }}.file.core.windows.net"
+  skuName: {{ .Values.storageaccount.file.sku }}
+  storageAccount: {{ .Values.storageaccount.file.storageaccountname }}
+  secretName: {{ .Values.storageaccount.file.secretname }}
+  secretNamespace: "default"
+  shareName: {{ .Values.storageaccount.file.filesharename }}
+  networkEndpointType: privateEndpoint
+  protocol: nfs
+provisioner: file.csi.azure.com
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+{{- end -}}

@@ -1,0 +1,9 @@
+venv-aro/*
+ansible/variables/common_var.yaml
+.vscode
+ansibel/.vscode/*
+ansible.cfg
+ansible/artefacts/*
+ansible/pullsecret.txt
+*pullsecret*
+*pull-secret*

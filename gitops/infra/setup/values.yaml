@@ -1,0 +1,84 @@
+
+storageaccount:
+  block:
+    sku: Premium_LRS
+    sc_name: managed-premium
+  file:
+   sku: Premium_LRS
+   sc_name: azurefiles-premium
+   storageaccountname: masstorageaccount01
+   resourcegroup: storageaccountrg
+  #  accesstier: Hot
+   filesharename: fileshare
+   secretname: sakey-secret
+
+eso:
+  clustersecretstore: akv-cluster-secret-read
+  # namespace: openshift-config
+  akvtenantid: 64dc69e4-d083-49fc-9569-ebece1dd1408
+  vaultname: dd-aro-cluster-akv
+  esoreadsecret: akv-sp-read
+  esoreadsecretns: openshift-operators
+
+entraid: 
+  id: ac52d2dd-b725-4009-b432-6be1fcbe2263
+  secretname: entraid-idp-auth-secret
+  tenantid: d84589ac-9d9c-44f1-a311-ff102f6f8b4e
+  secretKeyinAKV: entraidSecret
+
+#### Cluster Roles ####
+## cluster-admin -  A super-user that can perform any action in any project. 
+#                   When bound to a user with a local binding, they have full 
+#                   control over quota and every action on every resource in the project.
+## cluster-status - A user that can get basic cluster status information.
+## cluster-reader - A user that can get or view most of the objects but cannot modify them.
+clusterrolebinding:
+  - clusterrole: cluster-admin
+    groupids: 
+      - d0b32000-b1db-4eb1-89f3-685b871c06da
+
+### Role ####
+## admin      -  A project manager. If used in a local binding, an admin has rights to view any 
+#                resource in the project and modify any resource in the project except for quota. 
+## basic-user -  A user that can get basic information about projects and users.
+## edit       -  A user that can modify most objects in a project but does not have the power to 
+#                view or modify roles or bindings.
+## view       -  A user who cannot make any modifications, but can see most objects in a project. 
+#                They cannot view or modify roles or bindings.
+
+# rolebinding:
+#   - role: edit
+#     groupid: d0b32000-b1db-4eb1-89f3-685b871c0saa
+#     projects: 
+#       - cat-project
+#       - dog-project
+
+#   - role: admin
+#     groupid: d0b32000-b1db-4eb1-89f3-685b871c0poop
+#     projects: 
+#       - star-project
+#       - moon-project
+
+imagemirror:
+  - source: ghcr.io/external-secrets10/external-secrets
+    mirror: 
+      - acr.com/external-secrets10/external-secrets
+  - source: ghcr.io/grafana/grafana-operator10
+    mirror: 
+      - acr.com/grafana10/grafana-operator10
+
+autoscaler:
+  enabled: true
+  max_node_count: 9
+  min_aggregate_cpu: 48
+  max_aggregate_cpu: 144
+  min_aggregate_memory: 192
+  max_aggregate_memory: 576
+  min_replica_per_az: 1
+  max_replica_per_az: 3
+
+  machineset:
+    - ansible-aro-cluster-1-866w6-worker-eastus1
+    - ansible-aro-cluster-1-866w6-worker-eastus2
+    - ansible-aro-cluster-1-866w6-worker-eastus3
+
