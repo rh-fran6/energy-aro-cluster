@@ -883,7 +883,7 @@
   ansible.builtin.pause:
     minutes: 3
 
-- name: Bootstrap OpenShift GitOps
+- name: Bootstrap ArgoCD App in Apps 
   when: integrations.gitops.add
   block:
     - name: Bootstrap Cluster with ArgoCD
@@ -895,6 +895,31 @@
         chart_ref: "../gitops/infra/clusterbootstrap"
         release_namespace: platform
         create_namespace: true
+
+- name: Wait for Secret to be created and link it for image pull
+  when: integrations.gitops.add and integrations.imageregistry.add
+  block: 
+    - name: Wait for the Kubernetes Secret to exist
+      kubernetes.core.k8s_info:
+        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+        username: "{{ userName.stdout }}"
+        host: "{{ apiUrl.stdout }}"
+        validate_certs: false
+        api_version: v1
+        kind: Secret
+        namespace: default  
+        name: "{{ .Values.entraid.secretname }}"               
+      register: secret_info
+      until: secret_info.resources | length > 0  
+      retries: 10  
+      delay: 60  
+      ignore_errors: true
+
+    - name: Run oc secrets link command if the secret exists
+      ansible.builtin.command: >
+        oc secrets link default acr-secret --for=pull
+      when: secret_info.resources | length > 0
+      delegate_to: localhost
 
 - name: Read Default OpenShift Ingress Secret
   kubernetes.core.k8s_info:
