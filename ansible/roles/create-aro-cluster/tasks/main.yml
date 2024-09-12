@@ -879,9 +879,9 @@
           data:
             .dockerconfigjson: "{{ merged_data | to_nice_json | b64encode }}"
     
-- name: Wait for 3 minutes for ALL installed Operators to settle
-  ansible.builtin.pause:
-    minutes: 3
+# - name: Wait for 3 minutes for ALL installed Operators to settle
+#   ansible.builtin.pause:
+#     minutes: 3
 
 - name: Bootstrap ArgoCD App in Apps 
   when: integrations.gitops.add
@@ -908,16 +908,16 @@
         api_version: v1
         kind: Secret
         namespace: default  
-        name: "{{ .Values.entraid.secretname }}"               
+        name: "{{ integrations.imageregistry.secretname }}"               
       register: secret_info
       until: secret_info.resources | length > 0  
-      retries: 10  
+      retries: 2  
       delay: 60  
       ignore_errors: true
 
     - name: Run oc secrets link command if the secret exists
       ansible.builtin.command: >
-        oc secrets link default acr-secret --for=pull
+        oc secrets link default "{{ integrations.imageregistry.secretname }}"  --for=pull
       when: secret_info.resources | length > 0
       delegate_to: localhost
 
