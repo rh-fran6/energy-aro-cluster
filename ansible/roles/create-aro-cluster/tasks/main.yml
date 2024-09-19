@@ -64,6 +64,7 @@
   register: pull_secret
 
 - name: Read Installer Service Principal from AKV - Client ID
+  when: cluster.conditionals.install_with_sp
   azure.azcollection.azure_rm_keyvaultsecret_info:
     vault_uri: "{{ keyvaulturi }}"
     name: "{{ installer_clientid }}"
@@ -73,7 +74,8 @@
     subscription_id: "{{ subscription_id }}"
   register: installer_client_id
 
-- name: Read Cluster Service Principal from AKV - Client Secret
+- name: Read Installer Service Principal from AKV - Client Secret
+  when: cluster.conditionals.install_with_sp
   azure.azcollection.azure_rm_keyvaultsecret_info:
     vault_uri: "{{ keyvaulturi }}"
     name: "{{ installer_clientsecret }}"
@@ -83,13 +85,50 @@
     subscription_id: "{{ subscription_id }}"
   register: installer_client_secret
 
-- name: Set secrets from key vault into reusable variables
+- name: Read Image Registry Hostname from AKV
+  when: integrations.imageregistry.add
+  azure.azcollection.azure_rm_keyvaultsecret_info:
+    vault_uri: "{{ keyvaulturi }}"
+    name: "{{ imageRegistryHostnameKey }}"
+    client_id: "{{ akv_read_client_id }}"
+    secret: "{{ akv_read_client_secret }}"
+    tenant: "{{ tenant_id }}"
+    subscription_id: "{{ subscription_id }}"
+  register: image_registry_hostname
+
+- name: Read Image Registry Username from AKV
+  when: integrations.imageregistry.add
+  azure.azcollection.azure_rm_keyvaultsecret_info:
+    vault_uri: "{{ keyvaulturi }}"
+    name: "{{ imageRegistryUsernameKey }}"
+    client_id: "{{ akv_read_client_id }}"
+    secret: "{{ akv_read_client_secret }}"
+    tenant: "{{ tenant_id }}"
+    subscription_id: "{{ subscription_id }}"
+  register: image_registry_username
+
+- name: Read Image Registry Password from AKV
+  when: integrations.imageregistry.add
+  azure.azcollection.azure_rm_keyvaultsecret_info:
+    vault_uri: "{{ keyvaulturi }}"
+    name: "{{ imageRegistryPasswordKey }}"
+    client_id: "{{ akv_read_client_id }}"
+    secret: "{{ akv_read_client_secret }}"
+    tenant: "{{ tenant_id }}"
+    subscription_id: "{{ subscription_id }}"
+  register: image_registry_password
+
+- name: Set secrets from key vault into reusable variables for common parameters
   ansible.builtin.set_fact:
     clientId: "{{ cluster_client_id['secrets'][0]['secret'] }}"
     clientSecret: "{{ cluster_client_secret['secrets'][0]['secret'] }}"
     tenantId: "{{ cluster_tenant_id['secrets'][0]['secret'] }}"
     pullSecret: "{{ pull_secret['secrets'][0]['secret'] }}"
     subscriptionId: "{{ cluster_subscription_id['secrets'][0]['secret'] }}"
+
+- name: Set secrets from key vault into reusable variables for SP based parameters
+  when: cluster.conditionals.install_with_sp
+  ansible.builtin.set_fact:    
     installerClientId: "{{ installer_client_id['secrets'][0]['secret'] }}"
     installerClientSecret: "{{ installer_client_secret['secrets'][0]['secret'] }}"
 
@@ -97,8 +136,8 @@
   azure.azcollection.azure_rm_openshiftmanagedcluster_info:
     resource_group: "{{ cluster.cluster_resource_group }}"
     subscription_id: "{{ installer.subscription_id }}"
-    client_id: "{{ installerClientId }}"
-    secret: "{{ installerClientSecret }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
     tenant: "{{ installer.tenant_id  }}"
     name: "{{ cluster.name }}"
   register: _aro_check
@@ -116,7 +155,7 @@
           - Aborting {{ cluster.name }} cluster creation...
           - Error: "{{ _aro_check.clusters }}"
 
-- name: Create Network resources if cluster.conditionals.create_network_vnet_and_subnets is set to True
+- name: Create Network resources if cluster.conditionals.create_network_vnet_and_subnets is set to true
   when: cluster.conditionals.create_network_vnet_and_subnets
   block:
     - name: Create Resource Groups for VNET and Subnets
@@ -124,8 +163,8 @@
         name: "{{ vnet.network_rg }}"
         location: "{{ vnet.location }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id }}"
         state: present
         tags:  "{{ tags | items2dict(key_name='key', value_name='value') }}"
@@ -134,8 +173,8 @@
       azure.azcollection.azure_rm_virtualnetwork:
         resource_group: "{{ vnet.network_rg }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         name: "{{ vnet.name }}"
         address_prefixes_cidr: "{{ vnet.address_cidr }}"
@@ -146,8 +185,8 @@
         resource_group: "{{ vnet.network_rg }}"
         virtual_network_name: "{{ vnet.name }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         name: "{{ vnet.control_plane.name }}"
         address_prefix_cidr: "{{ vnet.control_plane.address_cidr }}"
@@ -160,8 +199,8 @@
       azure.azcollection.azure_rm_subnet:
         resource_group: "{{ vnet.network_rg }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         virtual_network_name: "{{ vnet.name }}"
         name: "{{ vnet.worker_plane.name }}"
@@ -175,8 +214,8 @@
         name: "{{ vnet.storageaccount.resourcegroup }}"
         location: "{{ vnet.location }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id }}"
         state: present
         tags:  "{{ tags | items2dict(key_name='key', value_name='value') }}"
@@ -185,8 +224,8 @@
       azure.azcollection.azure_rm_storageaccount:
         resource_group: "{{ vnet.storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         name: "{{ vnet.storageaccount.name }}"
         account_type: "{{ vnet.storageaccount.sku }}"
@@ -204,8 +243,8 @@
         name: "{{ vnet.storageaccount.nfs_sharename }}"
         resource_group: "{{ vnet.storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         account_name: "{{ vnet.storageaccount.name }}"
         root_squash: RootSquash
@@ -216,8 +255,8 @@
         name: "{{ vnet.storageaccount.privendpointname }}"
         resource_group: "{{ vnet.storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         private_link_service_connections:
           - name: storageaccountpe
@@ -237,8 +276,8 @@
       azure.azcollection.azure_rm_networkinterface_info:
         resource_group: "{{ vnet.storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         name: "{{ nic_name[0] }}"
       register: nic_details
@@ -252,16 +291,16 @@
         resource_group: "{{ vnet.storageaccount.resourcegroup }}"
         name: "privatelink.file.core.windows.net"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
 
     - name: Update virtual network link
       azure.azcollection.azure_rm_privatednszonelink:
         resource_group: "{{ vnet.storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         name: salink
         zone_name: "privatelink.file.core.windows.net"
@@ -273,8 +312,8 @@
       azure.azcollection.azure_rm_privatednsrecordset:
         resource_group: "{{ vnet.storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         zone_name: "privatelink.file.core.windows.net"
         relative_name: "{{ vnet.storageaccount.name }}"
@@ -294,25 +333,27 @@
     workerSubnet: "{{ vnet.worker_plane.name if cluster.conditionals.create_network_vnet_and_subnets else cluster.network.worker_subnet_name }}"
 
 - name: Create Cluster Resource Group
+  when: cluster.conditionals.create_cluster_resource_group
   azure.azcollection.azure_rm_resourcegroup:
     name: "{{ cluster.cluster_resource_group }}"
     subscription_id: "{{ installer.subscription_id }}"
-    client_id: "{{ installerClientId }}"
-    secret: "{{ installerClientSecret }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
     tenant: "{{ installer.tenant_id  }}"
     location: "{{ cluster.location }}"
     state: present
     tags:  "{{ tags | items2dict(key_name='key', value_name='value') }}"
 
 - name: Wait until the resource group exists
+  when: cluster.conditionals.create_cluster_resource_group
   azure.azcollection.azure_rm_resourcegroup_info:
     name: "{{ cluster.cluster_resource_group }}"
     subscription_id: "{{ installer.subscription_id }}"
-    client_id: "{{ installerClientId }}"
-    secret: "{{ installerClientSecret }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
     tenant: "{{ installer.tenant_id  }}"
   register: rg_facts
-  until: rg_facts.resourcegroups and rg_facts.resourcegroups[0].properties.provisioning_state == "Succeeded"
+  until: rg_facts.resourcegroups is defined and rg_facts.resourcegroups[0].properties.provisioning_state == "Succeeded"
   retries: 2
   delay: 20
 
@@ -376,44 +417,45 @@
         --subscription "{{ installer.subscription_id }}"
 
 - name: Read Service Principal details for cluster
+  when: cluster.conditionals.use_aro_sp and cluster.conditionals.assign_rbac_roles
   azure.azcollection.azure_rm_adserviceprincipal_info:
     app_id: "{{ clientId }}"
   register: useraccounts
     
 - name: Assign 'Contributor' role to ARO Service Principal for the storage accountresource group
-  when: cluster.conditionals.use_aro_sp and cluster.conditionals.create_network_vnet_and_subnets
+  when: cluster.conditionals.use_aro_sp and cluster.conditionals.assign_rbac_roles
   azure.azcollection.azure_rm_roleassignment:
     role_definition_id: "/subscriptions/{{ installer.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
     scope: "/subscriptions/{{ installer.subscription_id }}/resourceGroups/{{ vnet.storageaccount.resourcegroup }}"
     assignee_object_id: "{{ useraccounts.service_principals[0].object_id }}"
     subscription_id: "{{ installer.subscription_id }}"
-    client_id: "{{ installerClientId }}"
-    secret: "{{ installerClientSecret }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
     tenant: "{{ installer.tenant_id  }}"
 
-- name: Assign Contributor Role to SP in Resource Group "{{ cluster.cluster_resource_group }}"
-  when: cluster.conditionals.use_aro_sp
+- name: Assign Contributor Role to SP in Cluster Resource Group
+  when: cluster.conditionals.use_aro_sp and cluster.conditionals.assign_rbac_roles
   azure.azcollection.azure_rm_roleassignment:
     scope: "{{ rg_facts.resourcegroups[0].id }}"
     assignee_object_id: "{{ useraccounts.service_principals[0].object_id }}"
     subscription_id: "{{ installer.subscription_id }}"
-    client_id: "{{ installerClientId }}"
-    secret: "{{ installerClientSecret }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
     tenant: "{{ installer.tenant_id  }}"
     role_definition_id:
-      "/subscriptions/{{ cluster.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
+      "/subscriptions/{{ installer.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
  
-- name: Assign Network Contributor Role VNET "{{ vnetName }}"
-  when: cluster.conditionals.use_aro_sp
+- name: Assign Network Contributor Role to Cluster Service Principal in ARO VNET 
+  when: cluster.conditionals.use_aro_sp and cluster.conditionals.assign_rbac_roles
   azure.azcollection.azure_rm_roleassignment:
     scope: /subscriptions/{{ installer.subscription_id }}/resourceGroups/{{ vnetRG }}/providers/Microsoft.Network/virtualNetworks/{{ vnetName }}
     assignee_object_id: "{{ useraccounts.service_principals[0].object_id }}"
     subscription_id: "{{ installer.subscription_id }}"
-    client_id: "{{ installerClientId }}"
-    secret: "{{ installerClientSecret }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
     tenant: "{{ installer.tenant_id  }}"
     role_definition_id:
-      "/subscriptions/{{ cluster.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7"
+      "/subscriptions/{{ installer.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7"
 
 - name: Save pullSecret to File
   ansible.builtin.copy:
@@ -498,8 +540,8 @@
   azure.azcollection.azure_rm_openshiftmanagedcluster_info:
     resource_group: "{{ cluster.cluster_resource_group }}"
     subscription_id: "{{ installer.subscription_id }}"
-    client_id: "{{ installerClientId }}"
-    secret: "{{ installerClientSecret }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
     tenant: "{{ installer.tenant_id  }}"
     name: "{{ cluster.name }}"
   register: _aro_check
@@ -827,8 +869,8 @@
             source: redhat-operators 
             sourceNamespace: openshift-marketplace
 
-- name: Enable Insights reporting
-  when: integrations.insights.enabled
+- name: Enable Pull Secret Integrations
+  when: integrations.insights.enabled or integrations.imageregistry.add
   block:
     - name: Retrieve Cluster Pull Secret
       kubernetes.core.k8s_info:
@@ -843,26 +885,69 @@
       register: secret_data
 
     - name: Extract secret value
+      when: integrations.insights.enabled
       set_fact:
         cloud_secret_value: "{{ secret_data.resources[0].data['.dockerconfigjson'] | b64decode }}"
     
-    - name: Define JSON data for merge
+    - name: Define Insights integration data structure - pre-merge
+      when: integrations.insights.enabled
       ansible.builtin.set_fact:
-        new_data:
+        insight_data:
           auths:
             cloud.openshift.com:
               auth: "{{ pullSecret['auths']['cloud.openshift.com']['auth'] }}"
               email: "{{ pullSecret['auths']['cloud.openshift.com']['email'] }}"
 
-    - name: Merge the cloud.openshift.com values into Pull Secret
+    - name: Generate the dockerconfig.json using registry data
+      when: integrations.imageregistry.add
       ansible.builtin.set_fact:
-        merged_auths: "{{ cloud_secret_value.auths | combine(new_data.auths, recursive=True) }}"
-    
-    - name: Combine merged Dataset
+        registry_data: |
+          {
+            "auths": {
+              "{{ image_registry_hostname['secrets'][0]['secret'] }}": {
+                "email": "{{ user }}",
+                "auth": "{{ (image_registry_username['secrets'][0]['secret'] + ':' + image_registry_password['secrets'][0]['secret']) | b64encode }}"
+              }
+            }
+          }
+
+    - name: Merge Insight Data into Pull Secret
+      when: integrations.insights.enabled
       ansible.builtin.set_fact:
-        merged_data: "{{ cloud_secret_value | combine({'auths': merged_auths}) }}"
+        merged_auths: "{{ cloud_secret_value.auths | combine(insight_data.auths, recursive=True) }}"
+
+    - name: Create Secret for Image pull secret
+      when: integrations.imageregistry.add
+      ansible.builtin.set_fact:
+        dockerconfig_b64: "{{ registry_data | to_json | b64encode }}"
+
+    - name: Create Image pull Config Secret
+      when: integrations.imageregistry.add
+      kubernetes.core.k8s:
+        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+        username: "{{ userName.stdout }}"
+        host: "{{ apiUrl.stdout }}"
+        validate_certs: false
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: acr-registry-secret
+            namespace: default 
+          type: kubernetes.io/dockerconfigjson
+          data:
+            .dockerconfigjson: "{{ dockerconfig_b64 }}"
+
+    - name: Apply pull secret patchby linking
+      when: integrations.imageregistry.add
+      ansible.builtin.shell: |
+        oc login -u "{{ userName.stdout }}" -p "{{ passWord.stdout }}" "{{ apiUrl.stdout }}" && \
+        oc secrets link default acr-registry-secret --for=pull && \
+        oc logout
     
     - name: Replace .dockerconfigjson field of the pull secret
+      when: integrations.insights.enabled
       kubernetes.core.k8s:
         api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
         username: "{{ userName.stdout }}"
@@ -877,16 +962,17 @@
             namespace: openshift-config
           type: kubernetes.io/dockerconfigjson
           data:
-            .dockerconfigjson: "{{ merged_data | to_nice_json | b64encode }}"
+            .dockerconfigjson: "{{ {'auths': merged_auths} | to_json | b64encode }}"
     
-# - name: Wait for 3 minutes for ALL installed Operators to settle
-#   ansible.builtin.pause:
-#     minutes: 3
+- name: Wait for 3 minutes for ALL installed Operators to settle
+  ansible.builtin.pause:
+    minutes: 3
 
 - name: Bootstrap ArgoCD App in Apps 
   when: integrations.gitops.add
   block:
     - name: Bootstrap Cluster with ArgoCD
+      register: appBootstrap
       kubernetes.core.helm:
         name: cluster-bootstrap
         api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
@@ -895,31 +981,9 @@
         chart_ref: "../gitops/infra/clusterbootstrap"
         release_namespace: platform
         create_namespace: true
-
-- name: Wait for Secret to be created and link it for image pull
-  when: integrations.gitops.add and integrations.imageregistry.add
-  block: 
-    - name: Wait for the Kubernetes Secret to exist
-      kubernetes.core.k8s_info:
-        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
-        username: "{{ userName.stdout }}"
-        host: "{{ apiUrl.stdout }}"
-        validate_certs: false
-        api_version: v1
-        kind: Secret
-        namespace: default  
-        name: "{{ integrations.imageregistry.secretname }}"               
-      register: secret_info
-      until: secret_info.resources | length > 0  
-      retries: 2  
-      delay: 60  
-      ignore_errors: true
-
-    - name: Run oc secrets link command if the secret exists
-      ansible.builtin.command: >
-        oc secrets link default "{{ integrations.imageregistry.secretname }}"  --for=pull
-      when: secret_info.resources | length > 0
-      delegate_to: localhost
+      until: (appBootstrap.status is defined and appBootstrap.status.status == "deployed")
+      retries: 1  
+      delay: 10  
 
 - name: Read Default OpenShift Ingress Secret
   kubernetes.core.k8s_info:

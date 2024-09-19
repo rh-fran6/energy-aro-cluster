@@ -83,13 +83,17 @@
     subscription_id: "{{ subscription_id }}"
   register: installer_client_secret
 
-- name: Set secrets from key vault into reusable variables
+- name: Set secrets from key vault into reusable variables for common parameters
   ansible.builtin.set_fact:
     clientId: "{{ cluster_client_id['secrets'][0]['secret'] }}"
     clientSecret: "{{ cluster_client_secret['secrets'][0]['secret'] }}"
     tenantId: "{{ cluster_tenant_id['secrets'][0]['secret'] }}"
     pullSecret: "{{ pull_secret['secrets'][0]['secret'] }}"
     subscriptionId: "{{ cluster_subscription_id['secrets'][0]['secret'] }}"
+
+- name: Set secrets from key vault into reusable variables for SP based parameters
+  when: cluster.conditionals.install_with_sp
+  ansible.builtin.set_fact:    
     installerClientId: "{{ installer_client_id['secrets'][0]['secret'] }}"
     installerClientSecret: "{{ installer_client_secret['secrets'][0]['secret'] }}"
 
@@ -97,8 +101,8 @@
   azure.azcollection.azure_rm_openshiftmanagedcluster:
     resource_group: "{{ cluster.cluster_resource_group }}"
     subscription_id: "{{ installer.subscription_id }}"
-    client_id: "{{ installerClientId }}"
-    secret: "{{ installerClientSecret }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
     tenant: "{{ installer.tenant_id  }}"
     name: "{{ cluster.name }}"
     location: "{{ cluster.location }}"
@@ -108,8 +112,8 @@
   azure.azcollection.azure_rm_openshiftmanagedcluster_info:
     resource_group: "{{ cluster.cluster_resource_group }}"
     subscription_id: "{{ installer.subscription_id }}"
-    client_id: "{{ installerClientId }}"
-    secret: "{{ installerClientSecret }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
     tenant: "{{ installer.tenant_id  }}"
     name: "{{ cluster.name }}"
   register: _aro_check
@@ -124,8 +128,8 @@
       azure.azcollection.azure_rm_privatednszonelink_info:
         resource_group: "{{ vnet.storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         name: salink
         zone_name: "privatelink.file.core.windows.net"
@@ -136,8 +140,8 @@
       azure.azcollection.azure_rm_privatednszonelink:
         resource_group: "{{ vnet.storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         name: "salink"
         zone_name: "privatelink.file.core.windows.net"
@@ -150,8 +154,8 @@
         resource_group: "{{ vnet.storageaccount.resourcegroup }}"
         name: "privatelink.file.core.windows.net"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         state: absent
 
@@ -159,8 +163,8 @@
       azure.azcollection.azure_rm_resourcegroup:
         name: "{{ vnet.storageaccount.privendpointname }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         state: absent
 
@@ -168,8 +172,8 @@
       azure.azcollection.azure_rm_storageaccount:
         resource_group: "{{ vnet.storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         name: "{{ vnet.storageaccount.name }}"
         account_type: "{{ vnet.storageaccount.sku }}"
@@ -183,8 +187,8 @@
         resource_group: "{{ vnet.storageaccount.resourcegroup }}"
         location: "{{ vnet.location }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id }}"
         state: absent
 
@@ -192,8 +196,8 @@
       azure.azcollection.azure_rm_subnet:
         resource_group: "{{ vnet.network_rg }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         virtual_network_name: "{{ vnet.name }}"
         name: "{{ vnet.control_plane.name }}"
@@ -203,8 +207,8 @@
       azure.azcollection.azure_rm_subnet:
         resource_group: "{{ vnet.network_rg }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         virtual_network_name: "{{ vnet.name }}"
         name: "{{ vnet.worker_plane.name }}"
@@ -215,8 +219,8 @@
         name: "{{ vnet.name }}"
         resource_group: "{{ vnet.network_rg }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
       register: az_net_vnet_check
 
@@ -224,8 +228,8 @@
       azure.azcollection.azure_rm_virtualnetwork:
         resource_group: "{{ vnet.network_rg }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         name: "{{ vnet.name }}"
         state: absent
@@ -236,8 +240,8 @@
         name: "{{ vnet.name }}"
         resource_group: "{{ vnet.network_rg }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
       register: az_net_vnet
       until: az_net_vnet.virtualnetworks | length < 1
@@ -247,8 +251,8 @@
     - name: Check VNET Resource Group delete status
       azure.azcollection.azure_rm_resourcegroup_info:
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         name: "{{ vnet.name }}"
       register: az_net_rg_check
@@ -258,8 +262,8 @@
         name: "{{ vnet.network_rg }}"
         location: "{{ vnet.location }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         force_delete_nonempty: true
         state: absent
@@ -269,8 +273,8 @@
       azure.azcollection.azure_rm_resourcegroup_info:
         name: "{{ vnet.name }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
       register: az_net_rg
       until: az_net_rg.resourcegroups | length < 1
@@ -289,8 +293,8 @@
     scope: "/subscriptions/{{ installer.subscription_id }}/resourceGroups/{{ vnet.storageaccount.resourcegroup }}"
     assignee_object_id: "{{ useraccounts.service_principals[0].object_id }}"
     subscription_id: "{{ installer.subscription_id }}"
-    client_id: "{{ installerClientId }}"
-    secret: "{{ installerClientSecret }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
     tenant: "{{ installer.tenant_id  }}"
     state: absent
 
@@ -298,8 +302,8 @@
   azure.azcollection.azure_rm_resourcegroup_info:
     name: "{{ cluster.cluster_resource_group }}"
     subscription_id: "{{ installer.subscription_id }}"
-    client_id: "{{ installerClientId }}"
-    secret: "{{ installerClientSecret }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
     tenant: "{{ installer.tenant_id  }}"
   register: rg_facts
 
@@ -311,8 +315,8 @@
         scope: "{{ rg_facts.resourcegroups[0].id }}"
         assignee_object_id: "{{ useraccounts.service_principals[0].object_id }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         role_definition_id: "/subscriptions/{{ cluster.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
         state: absent
@@ -328,8 +332,8 @@
         scope: /subscriptions/{{ installer.subscription_id }}/resourceGroups/{{ vnetRG }}/providers/Microsoft.Network/virtualNetworks/{{ vnetName }}
         assignee_object_id: "{{ useraccounts.service_principals[0].object_id }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         role_definition_id:
           "/subscriptions/{{ cluster.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7"
@@ -340,8 +344,8 @@
         name: "{{ cluster.cluster_resource_group }}"
         location: "{{ cluster.location }}"
         subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId }}"
-        secret: "{{ installerClientSecret }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         force_delete_nonempty: true
         state: absent

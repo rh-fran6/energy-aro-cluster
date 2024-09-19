@@ -25,7 +25,6 @@ entraid:
   secretname: entraid-idp-auth-secret
   tenantid: d84589ac-9d9c-44f1-a311-ff102f6f8b4e
   secretKeyinAKV: entraidSecret
-  
 
 #### Cluster Roles ####
 ## cluster-admin -  A super-user that can perform any action in any project. 
@@ -48,7 +47,7 @@ clusterrolebinding:
 #                They cannot view or modify roles or bindings.
 
 # rolebinding:
-#   - role: view
+#   - role: edit
 #     groupid: d0b32000-b1db-4eb1-89f3-685b871c0saa
 #     projects: 
 #       - cat-project
@@ -61,15 +60,20 @@ clusterrolebinding:
 #       - moon-project
 
 imagemirror:
-  - source: ghcr.io/external-secrets/external-secrets
+  - source: ghcr.io/external-secrets10/external-secrets
     mirror: 
-      - acrarocac.azurecr.io/external-secrets/external-secrets
-  - source: ghcr.io/grafana/grafana-operator
+      - acr.com/external-secrets10/external-secrets
+  - source: ghcr.io/grafana/grafana-operator10
     mirror: 
-      - acrarocac.azurecr.io/grafana/grafana-operator
+      - acr.com/grafana10/grafana-operator10
+
+imageregistry:
+  registryusername: acrUsername
+  registrypassword: acrPassword
+  registryhostname: acrName
 
 autoscaler:
-  enabled: false
+  enabled: true
   max_node_count: 9
   min_aggregate_cpu: 48
   max_aggregate_cpu: 144
