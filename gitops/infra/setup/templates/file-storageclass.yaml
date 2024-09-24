@@ -1,4 +1,4 @@
-{{- if .Values.storageclass.create -}}
+{{- if .Values.storageaccount.file.create -}}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -6,13 +6,13 @@ metadata:
   annotations:
     storageclass.kubernetes.io/is-default-class: 'true'
 parameters:
-  resourceGroup: {{ .Values.storageaccount.file.resourcegroup }}
-  server: {{ .Values.storageaccount.file.storageaccountname }}.file.core.windows.net"
+  resourceGroup: {{ .Values.storageaccount.resourcegroup }}
+  server: {{ .Values.storageaccount.name }}.file.core.windows.net"
   skuName: {{ .Values.storageaccount.file.sku }}
-  storageAccount: {{ .Values.storageaccount.file.storageaccountname }}
+  storageAccount: {{ .Values.storageaccount.name }}
   secretName: {{ .Values.storageaccount.file.secretname }}
   secretNamespace: "default"
-  shareName: {{ .Values.storageaccount.file.filesharename }}
+  shareName: {{ .Values.storageaccount.file.nfs_sharename }}
   networkEndpointType: privateEndpoint
   protocol: nfs
 provisioner: file.csi.azure.com

@@ -1,4 +1,4 @@
-{{- if .Values.storageclass.create -}}
+{{- if .Values.storageaccount.block.create -}}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:

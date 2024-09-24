@@ -121,12 +121,12 @@
   retries: 60
   delay: 2
 
-- name: Delete Network resources if cluster.conditionals.create_network_vnet_and_subnets is set to True
+- name: Delete Network resources if cluster.conditionals.create_network_vnet_and_subnets is true
   when: cluster.conditionals.create_network_vnet_and_subnets
   block:
     - name: Get facts for one virtual network link in private DNS zone
       azure.azcollection.azure_rm_privatednszonelink_info:
-        resource_group: "{{ vnet.storageaccount.resourcegroup }}"
+        resource_group: "{{ storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
@@ -136,9 +136,9 @@
       register: salink_ispresent
 
     - name: Remove virtual network link
-      when: salink_ispresent.virtualnetworklinks | length > 0
+      when: salink_ispresent is defined and salink_ispresent.virtualnetworklinks | length > 0 
       azure.azcollection.azure_rm_privatednszonelink:
-        resource_group: "{{ vnet.storageaccount.resourcegroup }}"
+        resource_group: "{{ storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
@@ -150,8 +150,9 @@
         state: absent
 
     - name: Remove private DNS zone
+      when: salink_ispresent is defined and salink_ispresent.virtualnetworklinks | length > 0 and storageaccount.file.create
       azure.azcollection.azure_rm_privatednszone:
-        resource_group: "{{ vnet.storageaccount.resourcegroup }}"
+        resource_group: "{{ storageaccount.resourcegroup }}"
         name: "privatelink.file.core.windows.net"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
@@ -160,8 +161,9 @@
         state: absent
 
     - name: Remove Resource Group
+      when: storageaccount.file.create
       azure.azcollection.azure_rm_resourcegroup:
-        name: "{{ vnet.storageaccount.privendpointname }}"
+        name: "{{ storageaccount.privendpointname }}"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
@@ -169,23 +171,25 @@
         state: absent
 
     - name: Remove Storage Account
+      when: storageaccount.file.create
       azure.azcollection.azure_rm_storageaccount:
-        resource_group: "{{ vnet.storageaccount.resourcegroup }}"
+        resource_group: "{{ storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
-        name: "{{ vnet.storageaccount.name }}"
-        account_type: "{{ vnet.storageaccount.sku }}"
-        access_tier: "{{ vnet.storageaccount.access_tier }}"
-        kind: "{{ vnet.storageaccount.kind }}"
+        name: "{{ storageaccount.name }}"
+        account_type: "{{ storageaccount.sku }}"
+        access_tier: "{{ storageaccount.accesstier }}"
+        kind: "{{ storageaccount.kind }}"
         state: absent
 
     - name: Remove Private Endpoint
+      when: cluster.conditionals.create_network_vnet_and_subnets and storageaccount.file.create
       azure.azcollection.azure_rm_privateendpoint:
-        name: "{{ vnet.storageaccount.privendpointname }}"
-        resource_group: "{{ vnet.storageaccount.resourcegroup }}"
-        location: "{{ vnet.location }}"
+        name: "{{ storageaccount.privendpointname }}"
+        resource_group: "{{ storageaccount.resourcegroup }}"
+        location: "{{ storageaccount.location }}"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
@@ -282,15 +286,16 @@
       delay: 5
 
 - name: Read Service Principal details for cluster
+  when: cluster.conditionals.use_aro_sp and cluster.conditionals.assign_rbac_roles
   azure.azcollection.azure_rm_adserviceprincipal_info:
     app_id: "{{ clientId }}"
   register: useraccounts
 
 - name: Remove 'Contributor' role from ARO Service Principal for the storage accountresource group
-  when: cluster.conditionals.use_aro_sp and cluster.conditionals.create_network_vnet_and_subnets
+  when: cluster.conditionals.use_aro_sp and cluster.conditionals.assign_rbac_roles
   azure.azcollection.azure_rm_roleassignment:
     role_definition_id: "/subscriptions/{{ installer.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
-    scope: "/subscriptions/{{ installer.subscription_id }}/resourceGroups/{{ vnet.storageaccount.resourcegroup }}"
+    scope: "/subscriptions/{{ installer.subscription_id }}/resourceGroups/{{ storageaccount.resourcegroup }}"
     assignee_object_id: "{{ useraccounts.service_principals[0].object_id }}"
     subscription_id: "{{ installer.subscription_id }}"
     client_id: "{{ installerClientId | default(omit) }}"
@@ -299,6 +304,7 @@
     state: absent
 
 - name: Get facts for Cluster resource group
+  when: cluster.conditionals.create_cluster_resource_group
   azure.azcollection.azure_rm_resourcegroup_info:
     name: "{{ cluster.cluster_resource_group }}"
     subscription_id: "{{ installer.subscription_id }}"
@@ -308,9 +314,10 @@
   register: rg_facts
 
 - name: Conditionally remove cluster resource group and permissions
-  when: cluster.conditionals.use_aro_sp and rg_facts.resourcegroups | length > 0
+  when: cluster.conditionals.use_aro_sp and rg_facts.resourcegroups is defined and rg_facts.resourcegroups | length > 0 and cluster.conditionals.assign_rbac_roles
   block:
     - name: Remove Contributor Role SP from Resource Group "{{ cluster.cluster_resource_group }}"
+      when: cluster.conditionals.create_cluster_resource_group
       azure.azcollection.azure_rm_roleassignment:
         scope: "{{ rg_facts.resourcegroups[0].id }}"
         assignee_object_id: "{{ useraccounts.service_principals[0].object_id }}"
@@ -318,7 +325,7 @@
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
-        role_definition_id: "/subscriptions/{{ cluster.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
+        role_definition_id: "/subscriptions/{{ installer.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
         state: absent
     
     - name: Conditionally set variable names based on the condition settings
@@ -327,7 +334,7 @@
         vnetRG: "{{ vnet.network_rg if cluster.conditionals.create_network_vnet_and_subnets else cluster.network.vnet_rg }}"
      
     - name: Remove Network Contributor Role VNET "{{ vnet.name }}"
-      when: cluster.conditionals.use_aro_sp
+      when: cluster.conditionals.use_aro_sp and cluster.conditionals.assign_rbac_roles
       azure.azcollection.azure_rm_roleassignment:
         scope: /subscriptions/{{ installer.subscription_id }}/resourceGroups/{{ vnetRG }}/providers/Microsoft.Network/virtualNetworks/{{ vnetName }}
         assignee_object_id: "{{ useraccounts.service_principals[0].object_id }}"
@@ -336,10 +343,11 @@
         secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         role_definition_id:
-          "/subscriptions/{{ cluster.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7"
+          "/subscriptions/{{ installer.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7"
         state: absent
 
     - name: Delete Cluster Resource Group
+      when: cluster.conditionals.create_cluster_resource_group
       azure.azcollection.azure_rm_resourcegroup:
         name: "{{ cluster.cluster_resource_group }}"
         location: "{{ cluster.location }}"

@@ -1,30 +1,5 @@
 
-storageaccount:
-  block:
-    sku: Premium_LRS
-    sc_name: managed-premium
-  file:
-   sku: Premium_LRS
-   sc_name: azurefiles-premium
-   storageaccountname: masstorageaccount01
-   resourcegroup: storageaccountrg
-  #  accesstier: Hot
-   filesharename: fileshare
-   secretname: sakey-secret
 
-eso:
-  clustersecretstore: akv-cluster-secret-read
-  # namespace: openshift-config
-  akvtenantid: 64dc69e4-d083-49fc-9569-ebece1dd1408
-  vaultname: dd-aro-cluster-akv
-  esoreadsecret: akv-sp-read
-  esoreadsecretns: openshift-operators
-
-entraid: 
-  id: ac52d2dd-b725-4009-b432-6be1fcbe2263
-  secretname: entraid-idp-auth-secret
-  tenantid: d84589ac-9d9c-44f1-a311-ff102f6f8b4e
-  secretKeyinAKV: entraidSecret
 
 #### Cluster Roles ####
 ## cluster-admin -  A super-user that can perform any action in any project. 
@@ -59,31 +34,5 @@ clusterrolebinding:
 #       - star-project
 #       - moon-project
 
-imagemirror:
-  - source: ghcr.io/external-secrets10/external-secrets
-    mirror: 
-      - acr.com/external-secrets10/external-secrets
-  - source: ghcr.io/grafana/grafana-operator10
-    mirror: 
-      - acr.com/grafana10/grafana-operator10
 
-imageregistry:
-  registryusername: acrUsername
-  registrypassword: acrPassword
-  registryhostname: acrName
-
-autoscaler:
-  enabled: true
-  max_node_count: 9
-  min_aggregate_cpu: 48
-  max_aggregate_cpu: 144
-  min_aggregate_memory: 192
-  max_aggregate_memory: 576
-  min_replica_per_az: 1
-  max_replica_per_az: 3
-
-  machineset:
-    - ansible-aro-cluster-1-866w6-worker-eastus1
-    - ansible-aro-cluster-1-866w6-worker-eastus2
-    - ansible-aro-cluster-1-866w6-worker-eastus3
 

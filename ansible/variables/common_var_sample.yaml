@@ -11,6 +11,4 @@ installer:
   subscription_id: <installer subscription id>
   tenant_id: <installer tenant id>
 
-cluster:
-  subscription_id: <aro cluster subscription id>
 

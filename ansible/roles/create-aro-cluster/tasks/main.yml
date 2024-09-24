@@ -209,10 +209,13 @@
           - service: "Microsoft.ContainerRegistry"
       register: workerSubnet
 
+- name: Create Storage Class for File backed by NFS 
+  when: storageaccount.file.create
+  block:
     - name: Create Resource Groups for Private Endpoint
       azure.azcollection.azure_rm_resourcegroup:
-        name: "{{ vnet.storageaccount.resourcegroup }}"
-        location: "{{ vnet.location }}"
+        name: "{{ storageaccount.resourcegroup }}"
+        location: "{{ storageaccount.location }}"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
@@ -222,38 +225,39 @@
     
     - name: Create Storage Account 
       azure.azcollection.azure_rm_storageaccount:
-        resource_group: "{{ vnet.storageaccount.resourcegroup }}"
+        resource_group: "{{ storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
-        name: "{{ vnet.storageaccount.name }}"
-        account_type: "{{ vnet.storageaccount.sku }}"
-        access_tier: "{{ vnet.storageaccount.access_tier }}"
-        kind: "{{ vnet.storageaccount.kind }}"
-        minimum_tls_version: "{{ vnet.storageaccount.min_tls_version }}"
+        name: "{{ storageaccount.name }}"
+        account_type: "{{ storageaccount.sku }}"
+        access_tier: "{{ storageaccount.accesstier }}"
+        kind: "{{ storageaccount.kind }}"
+        minimum_tls_version: "{{ storageaccount.min_tls_version }}"
         https_only: false
-        public_network_access: "{{ vnet.storageaccount.publicaccess }}"
+        public_network_access: "{{ storageaccount.publicaccess }}"
         allow_shared_key_access: true
         tags:  "{{ tags | items2dict(key_name='key', value_name='value') }}"
       register: sa
     
     - name: Create share with NFS enabled protocols
       azure.azcollection.azure_rm_storageshare:
-        name: "{{ vnet.storageaccount.nfs_sharename }}"
-        resource_group: "{{ vnet.storageaccount.resourcegroup }}"
+        name: "{{ storageaccount.file.nfs_sharename }}"
+        resource_group: "{{ storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
-        account_name: "{{ vnet.storageaccount.name }}"
+        account_name: "{{ storageaccount.name }}"
         root_squash: RootSquash
         enabled_protocols: NFS
     
     - name: Create private endpoint
+      when: cluster.conditionals.create_network_vnet_and_subnets
       azure.azcollection.azure_rm_privateendpoint:
-        name: "{{ vnet.storageaccount.privendpointname }}"
-        resource_group: "{{ vnet.storageaccount.resourcegroup }}"
+        name: "{{ storageaccount.privendpointname }}"
+        resource_group: "{{ storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
@@ -269,12 +273,14 @@
       register: net_int
 
     - name: Extract PE network interface name using regex
+      when: cluster.conditionals.create_network_vnet_and_subnets
       set_fact:
         nic_name: "{{ net_int.state.network_interfaces[0] | regex_search('networkInterfaces/(.*)', '\\1') }}"
     
     - name: Get facts for one network interface
+      when: cluster.conditionals.create_network_vnet_and_subnets
       azure.azcollection.azure_rm_networkinterface_info:
-        resource_group: "{{ vnet.storageaccount.resourcegroup }}"
+        resource_group: "{{ storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
@@ -283,12 +289,14 @@
       register: nic_details
 
     - name: Extract the IP Address of the Private Endpoint
+      when: cluster.conditionals.create_network_vnet_and_subnets
       set_fact:
         ip_address: "{{ nic_details.networkinterfaces[0].ip_configurations[0].private_ip_address }}"
 
     - name: Create private DNS zone
+      when: cluster.conditionals.create_network_vnet_and_subnets
       azure.azcollection.azure_rm_privatednszone:
-        resource_group: "{{ vnet.storageaccount.resourcegroup }}"
+        resource_group: "{{ storageaccount.resourcegroup }}"
         name: "privatelink.file.core.windows.net"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
@@ -296,8 +304,9 @@
         tenant: "{{ installer.tenant_id  }}"
 
     - name: Update virtual network link
+      when: cluster.conditionals.create_network_vnet_and_subnets
       azure.azcollection.azure_rm_privatednszonelink:
-        resource_group: "{{ vnet.storageaccount.resourcegroup }}"
+        resource_group: "{{ storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
@@ -309,20 +318,22 @@
         state: present
 
     - name: Create A record in the private DNS zone
+      when: cluster.conditionals.create_network_vnet_and_subnets
       azure.azcollection.azure_rm_privatednsrecordset:
-        resource_group: "{{ vnet.storageaccount.resourcegroup }}"
+        resource_group: "{{ storageaccount.resourcegroup }}"
         subscription_id: "{{ installer.subscription_id }}"
         client_id: "{{ installerClientId | default(omit) }}"
         secret: "{{ installerClientSecret | default(omit) }}"
         tenant: "{{ installer.tenant_id  }}"
         zone_name: "privatelink.file.core.windows.net"
-        relative_name: "{{ vnet.storageaccount.name }}"
+        relative_name: "{{ storageaccount.name }}"
         record_type: A
         records:
           - entry: "{{ ip_address }}"
 
     - name: Get storage account key
-      ansible.builtin.command: az storage account keys list --account-name "{{ vnet.storageaccount.name }}" --query "[0].value" -o tsv --subscription "{{ installer.subscription_id }}"
+      when: cluster.conditionals.create_network_vnet_and_subnets
+      ansible.builtin.command: az storage account keys list --account-name "{{ storageaccount.name }}" --query "[0].value" -o tsv --subscription "{{ installer.subscription_id }}"
       register: storageaccount_key
 
 - name: Conditionally set variable names based on the condition settings
@@ -426,7 +437,7 @@
   when: cluster.conditionals.use_aro_sp and cluster.conditionals.assign_rbac_roles
   azure.azcollection.azure_rm_roleassignment:
     role_definition_id: "/subscriptions/{{ installer.subscription_id }}/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
-    scope: "/subscriptions/{{ installer.subscription_id }}/resourceGroups/{{ vnet.storageaccount.resourcegroup }}"
+    scope: "/subscriptions/{{ installer.subscription_id }}/resourceGroups/{{ storageaccount.resourcegroup }}"
     assignee_object_id: "{{ useraccounts.service_principals[0].object_id }}"
     subscription_id: "{{ installer.subscription_id }}"
     client_id: "{{ installerClientId | default(omit) }}"
@@ -501,15 +512,28 @@
       --verbose
       --no-wait"
 
+# - name: Define Conditionally Added Parameters
+#   ansible.builtin.set_fact:
+#     optional_params:
+#       - { param: 'domain', value: "{{ cluster.domain }}", condition: "{{ cluster.conditionals.specify_custom_domain }}" }
+#       - { param: 'version', value: "{{ cluster.version }}", condition: "{{ cluster.conditionals.specify_version }}" }
+#       - { param: 'disk-encryption-set', value: "{{ cluster.disk_encryption_set }}", condition: "{{ cluster.conditionals.specify_disk_encryption_set }}" }
+#       - { param: 'client-id', value: "{{ clientId }}", condition: "{{ cluster.conditionals.use_aro_sp }}" }
+#       - { param: 'client-secret', value: "{{ clientSecret }}", condition: "{{ cluster.conditionals.use_aro_sp }}" }
+#   no_log: True
+
 - name: Define Conditionally Added Parameters
   ansible.builtin.set_fact:
-    optional_params:
-      - { param: 'domain', value: "{{ cluster.domain }}", condition: "{{ cluster.conditionals.specify_custom_domain }}" }
-      - { param: 'version', value: "{{ cluster.version }}", condition: "{{ cluster.conditionals.specify_version }}" }
-      - { param: 'disk-encryption-set', value: "{{ cluster.disk_encryption_set }}", condition: "{{ cluster.conditionals.specify_disk_encryption_set }}" }
-      - { param: 'client-id', value: "{{ clientId }}", condition: "{{ cluster.conditionals.use_aro_sp }}" }
-      - { param: 'client-secret', value: "{{ clientSecret }}", condition: "{{ cluster.conditionals.use_aro_sp }}" }
+    optional_params: >-
+      {{ [
+        {'param': 'domain', 'value': cluster.domain, 'condition': cluster.conditionals.specify_custom_domain},
+        {'param': 'version', 'value': cluster.version, 'condition': cluster.conditionals.specify_version},
+        {'param': 'disk-encryption-set', 'value': cluster.disk_encryption_set, 'condition': cluster.conditionals.specify_disk_encryption_set},
+        {'param': 'client-id', 'value': clientId, 'condition': cluster.conditionals.use_aro_sp},
+        {'param': 'client-secret', 'value': clientSecret, 'condition': cluster.conditionals.use_aro_sp}
+      ] | selectattr('condition', 'eq', true) | list }}
   no_log: True
+
 
 - name: Reconstruct ARO Deployment command
   ansible.builtin.set_fact:
@@ -547,7 +571,7 @@
   register: _aro_check
   until: (_aro_check.clusters is defined and _aro_check.clusters.properties is defined and _aro_check.clusters.properties.provisioningState == "Succeeded")
   failed_when: (_aro_check.clusters is defined and _aro_check.clusters.properties is defined and _aro_check.clusters.properties.provisioningState == "Failed")
-  retries: 60
+  retries: 120
   delay: 60
 
 - name: Read ARO API URL
@@ -623,6 +647,9 @@
     password: "{{ passWord.stdout }}"
     host: "{{ apiUrl.stdout }}"
     validate_certs: false
+  retries: 30                 
+  delay: 2                 
+  until: openshift_auth_results.openshift_auth.api_key is defined
 
 - name: Bootstrap OpenShift GitOps
   when: integrations.gitops.add
@@ -745,7 +772,7 @@
         oauth_redirect_url: "https://oauth-openshift.apps.{{ redirect_url.stdout }}.{{ cluster.location }}.aroapp.io/oauth2callback/SSO-EntraID"
 
 - name: Create Storage Class secret
-  when: storageclass.create
+  when: storageaccount.file.create
   kubernetes.core.k8s:
     state: present
     api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
@@ -756,15 +783,15 @@
       apiVersion: v1
       kind: Secret
       metadata:
-        name: "{{ vnet.storageaccount.name }}"
+        name: "{{ storageaccount.name }}"
         namespace: default
       type: generic
       stringData:
-        azurestorageaccountname: "{{ vnet.storageaccount.name }}"
+        azurestorageaccountname: "{{ storageaccount.name }}"
         azurestorageaccountkey: "{{ storageaccount_key.stdout }}"
 
 - name: Patch default storageclass
-  when: storageclass.create
+  when: storageaccount.block.create
   kubernetes.core.k8s:
     api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
     username: "{{ userName.stdout }}"
@@ -780,7 +807,7 @@
 - name: Install Extended Logging Operators
   when: integrations.extendedlogging.enabled
   block:
-    - name: Create Namespaces
+    - name: Create Namespaces - openshift-operators-redhat for Loki
       kubernetes.core.k8s:
         api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
         username: "{{ userName.stdout }}"
@@ -790,13 +817,13 @@
           apiVersion: v1
           kind: Namespace
           metadata:
-            name: openshift-operators-redhat 
+            name: openshift-operators-redhat
             annotations:
-              openshift.io/node-selector: ""
+                openshift.io/node-selector: "" 
             labels:
               openshift.io/cluster-monitoring: "true" 
               
-    - name: Create Namespaces
+    - name: Create Namespaces - openshift-logging
       kubernetes.core.k8s:
         api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
         username: "{{ userName.stdout }}"
@@ -806,9 +833,9 @@
           apiVersion: v1
           kind: Namespace
           metadata:
-          name: openshift-logging 
-          annotations:
-              openshift.io/node-selector: ""
+            name: openshift-logging 
+            annotations:
+                openshift.io/node-selector: ""
           labels:
               openshift.io/cluster-logging: "true"
               openshift.io/cluster-monitoring: "true"
@@ -831,7 +858,7 @@
             targetNamespaces:
             - openshift-logging
 
-    - name: Install Loki Operator
+    - name: Install Loki Operator Subscription
       kubernetes.core.k8s:
         api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
         username: "{{ userName.stdout }}"
@@ -841,14 +868,33 @@
           apiVersion: operators.coreos.com/v1alpha1
           kind: Subscription
           metadata:
-            name: loki-operator-subscription
+            name: loki-operator
             namespace: openshift-operators-redhat
+            labels:
+              operators.coreos.com/loki-operator.openshift-operators-redhat: ""
           spec:
-            channel:  
+            channel: stable-5.9
             installPlanApproval: Automatic
             name: loki-operator 
             source: redhat-operators 
             sourceNamespace: openshift-marketplace
+
+    - name: Install Loki Operator Group
+      kubernetes.core.k8s:
+        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+        username: "{{ userName.stdout }}"
+        host: "{{ apiUrl.stdout }}"
+        validate_certs: false
+        definition:
+          apiVersion: operators.coreos.com/v1
+          kind: OperatorGroup
+          metadata:
+            annotations:
+              olm.providedAPIs: AlertingRule.v1.loki.grafana.com,LokiStack.v1.loki.grafana.com,RecordingRule.v1.loki.grafana.com,RulerConfig.v1.loki.grafana.com
+            name: openshift-operators-redhat
+            namespace: openshift-operators-redhat
+          spec:
+            upgradeStrategy: Default
 
     - name: Install OpenShift Logging Operator
       kubernetes.core.k8s:
@@ -860,7 +906,7 @@
           apiVersion: operators.coreos.com/v1alpha1
           kind: Subscription
           metadata:
-            name: cluster-logging-subscription
+            name: cluster-logging
             namespace: openshift-logging
           spec:
             channel:  
@@ -898,53 +944,10 @@
               auth: "{{ pullSecret['auths']['cloud.openshift.com']['auth'] }}"
               email: "{{ pullSecret['auths']['cloud.openshift.com']['email'] }}"
 
-    - name: Generate the dockerconfig.json using registry data
-      when: integrations.imageregistry.add
-      ansible.builtin.set_fact:
-        registry_data: |
-          {
-            "auths": {
-              "{{ image_registry_hostname['secrets'][0]['secret'] }}": {
-                "email": "{{ user }}",
-                "auth": "{{ (image_registry_username['secrets'][0]['secret'] + ':' + image_registry_password['secrets'][0]['secret']) | b64encode }}"
-              }
-            }
-          }
-
     - name: Merge Insight Data into Pull Secret
       when: integrations.insights.enabled
       ansible.builtin.set_fact:
         merged_auths: "{{ cloud_secret_value.auths | combine(insight_data.auths, recursive=True) }}"
-
-    - name: Create Secret for Image pull secret
-      when: integrations.imageregistry.add
-      ansible.builtin.set_fact:
-        dockerconfig_b64: "{{ registry_data | to_json | b64encode }}"
-
-    - name: Create Image pull Config Secret
-      when: integrations.imageregistry.add
-      kubernetes.core.k8s:
-        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
-        username: "{{ userName.stdout }}"
-        host: "{{ apiUrl.stdout }}"
-        validate_certs: false
-        state: present
-        definition:
-          apiVersion: v1
-          kind: Secret
-          metadata:
-            name: acr-registry-secret
-            namespace: default 
-          type: kubernetes.io/dockerconfigjson
-          data:
-            .dockerconfigjson: "{{ dockerconfig_b64 }}"
-
-    - name: Apply pull secret patchby linking
-      when: integrations.imageregistry.add
-      ansible.builtin.shell: |
-        oc login -u "{{ userName.stdout }}" -p "{{ passWord.stdout }}" "{{ apiUrl.stdout }}" && \
-        oc secrets link default acr-registry-secret --for=pull && \
-        oc logout
     
     - name: Replace .dockerconfigjson field of the pull secret
       when: integrations.insights.enabled
@@ -971,7 +974,7 @@
 - name: Bootstrap ArgoCD App in Apps 
   when: integrations.gitops.add
   block:
-    - name: Bootstrap Cluster with ArgoCD
+    - name: Install Helm Application Bootstrapper
       register: appBootstrap
       kubernetes.core.helm:
         name: cluster-bootstrap
@@ -982,8 +985,8 @@
         release_namespace: platform
         create_namespace: true
       until: (appBootstrap.status is defined and appBootstrap.status.status == "deployed")
-      retries: 1  
-      delay: 10  
+      retries: 60  
+      delay: 2 
 
 - name: Read Default OpenShift Ingress Secret
   kubernetes.core.k8s_info:

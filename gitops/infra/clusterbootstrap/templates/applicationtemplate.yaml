@@ -1,4 +1,4 @@
-{{ $valuesFile := "../../../../ansible/variables/test_var.yaml" }}
+
 {{ $appNamespace := .Values.global.openshiftGitopsNamespace }}
 {{- range $key, $value := .Values.applications }}
 apiVersion: argoproj.io/v1alpha1
@@ -25,7 +25,15 @@ spec:
       ref: values
       helm:
         valueFiles:
-          - $values/ansible/variables/test_var.yaml
+          - $values/ansible/variables/test_var.yaml         
+  ignoreDifferences:   
+    - group: ""
+      kind: ServiceAccount
+      name: default
+      namespace: default
+      jsonPointers:
+        - /imagePullSecrets
+        - /secrets
   syncPolicy:
     automated: {}
     retry:
@@ -42,7 +50,7 @@ spec:
 {{- end }}    
     syncOptions:
       - CreateNamespace=true
-      # - ApplyOutOfSyncOnly=true
+      - ApplyOutOfSyncOnly=true
     retry:
       limit: 5 
       backoff:

@@ -9,9 +9,9 @@ spec:
     mappingMethod: claim
     type: OpenID
     openID:
-      clientID: {{ .Values.entraid.id }}
+      clientID: {{ .Values.integrations.entraid.clientid }}
       clientSecret:
-        name: {{ .Values.entraid.secretname }}
+        name: {{ .Values.integrations.entraid.secretname }}
       extraScopes:
       - email
       - profile
@@ -27,5 +27,5 @@ spec:
         - email
         groups:
         - groups
-      issuer: https://login.microsoftonline.com/{{ .Values.entraid.tenantid }}/v2.0
+      issuer: https://login.microsoftonline.com/{{ .Values.integrations.entraid.tenantid }}/v2.0
 {{- end -}}
