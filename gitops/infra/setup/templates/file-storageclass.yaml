@@ -7,16 +7,17 @@ metadata:
     storageclass.kubernetes.io/is-default-class: 'true'
 parameters:
   resourceGroup: {{ .Values.storageaccount.resourcegroup }}
-  server: {{ .Values.storageaccount.name }}.file.core.windows.net"
+  # server: {{ .Values.storageaccount.name }}.file.core.windows.net #
   skuName: {{ .Values.storageaccount.file.sku }}
-  storageAccount: {{ .Values.storageaccount.name }}
-  secretName: {{ .Values.storageaccount.file.secretname }}
-  secretNamespace: "default"
-  shareName: {{ .Values.storageaccount.file.nfs_sharename }}
+  storageAccount: {{ .Values.storageaccount.name }} #
+  secretName: {{ .Values.storageaccount.file.secretname }} #
+  secretNamespace: "default" #
+  location: {{ .Values.storageaccount.location }}
+  # shareName: {{ .Values.storageaccount.file.nfs_sharename }} #
   networkEndpointType: privateEndpoint
   protocol: nfs
 provisioner: file.csi.azure.com
-reclaimPolicy: Delete
+reclaimPolicy: Retain
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
 {{- end -}}

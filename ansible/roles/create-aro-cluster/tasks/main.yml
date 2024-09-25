@@ -241,17 +241,17 @@
         tags:  "{{ tags | items2dict(key_name='key', value_name='value') }}"
       register: sa
     
-    - name: Create share with NFS enabled protocols
-      azure.azcollection.azure_rm_storageshare:
-        name: "{{ storageaccount.file.nfs_sharename }}"
-        resource_group: "{{ storageaccount.resourcegroup }}"
-        subscription_id: "{{ installer.subscription_id }}"
-        client_id: "{{ installerClientId | default(omit) }}"
-        secret: "{{ installerClientSecret | default(omit) }}"
-        tenant: "{{ installer.tenant_id  }}"
-        account_name: "{{ storageaccount.name }}"
-        root_squash: RootSquash
-        enabled_protocols: NFS
+    # - name: Create share with NFS enabled protocols
+    #   azure.azcollection.azure_rm_storageshare:
+    #     name: "{{ storageaccount.file.nfs_sharename }}"
+    #     resource_group: "{{ storageaccount.resourcegroup }}"
+    #     subscription_id: "{{ installer.subscription_id }}"
+    #     client_id: "{{ installerClientId | default(omit) }}"
+    #     secret: "{{ installerClientSecret | default(omit) }}"
+    #     tenant: "{{ installer.tenant_id  }}"
+    #     account_name: "{{ storageaccount.name }}"
+    #     root_squash: RootSquash
+    #     enabled_protocols: NFS
     
     - name: Create private endpoint
       when: cluster.conditionals.create_network_vnet_and_subnets
@@ -511,16 +511,6 @@
       --output json
       --verbose
       --no-wait"
-
-# - name: Define Conditionally Added Parameters
-#   ansible.builtin.set_fact:
-#     optional_params:
-#       - { param: 'domain', value: "{{ cluster.domain }}", condition: "{{ cluster.conditionals.specify_custom_domain }}" }
-#       - { param: 'version', value: "{{ cluster.version }}", condition: "{{ cluster.conditionals.specify_version }}" }
-#       - { param: 'disk-encryption-set', value: "{{ cluster.disk_encryption_set }}", condition: "{{ cluster.conditionals.specify_disk_encryption_set }}" }
-#       - { param: 'client-id', value: "{{ clientId }}", condition: "{{ cluster.conditionals.use_aro_sp }}" }
-#       - { param: 'client-secret', value: "{{ clientSecret }}", condition: "{{ cluster.conditionals.use_aro_sp }}" }
-#   no_log: True
 
 - name: Define Conditionally Added Parameters
   ansible.builtin.set_fact:
@@ -850,13 +840,10 @@
           apiVersion: operators.coreos.com/v1
           kind: OperatorGroup
           metadata:
-            annotations:
-              argocd.argoproj.io/sync-wave: "0"
             name: cluster-logging
             namespace: openshift-logging 
           spec:
-            targetNamespaces:
-            - openshift-logging
+            upgradeStrategy: Default
 
     - name: Install Loki Operator Subscription
       kubernetes.core.k8s:
@@ -909,7 +896,7 @@
             name: cluster-logging
             namespace: openshift-logging
           spec:
-            channel:  
+            channel:  stable-5.9
             installPlanApproval: Automatic
             name: cluster-logging 
             source: redhat-operators 
