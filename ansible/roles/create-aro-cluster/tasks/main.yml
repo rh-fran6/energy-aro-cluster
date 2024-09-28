@@ -118,6 +118,39 @@
     subscription_id: "{{ subscription_id }}"
   register: image_registry_password
 
+- name: Read MAS License Secrets 
+  when: mas.prepare_install
+  block:
+    - name: Read MAS Entitlement
+      azure.azcollection.azure_rm_keyvaultsecret_info:
+        vault_uri: "{{ keyvaulturi }}"
+        name: "{{ masEntitlementKey }}"
+        client_id: "{{ akv_read_client_id }}"
+        secret: "{{ akv_read_client_secret }}"
+        tenant: "{{ tenant_id }}"
+        subscription_id: "{{ subscription_id }}"
+      register: mas_entitlement_reg
+
+    - name: Read MAS License ID
+      azure.azcollection.azure_rm_keyvaultsecret_info:
+        vault_uri: "{{ keyvaulturi }}"
+        name: "{{ masLicenseIdKey }}"
+        client_id: "{{ akv_read_client_id }}"
+        secret: "{{ akv_read_client_secret }}"
+        tenant: "{{ tenant_id }}"
+        subscription_id: "{{ subscription_id }}"
+      register: mas_licenseid_reg
+
+    - name: Read MAS License 
+      azure.azcollection.azure_rm_keyvaultsecret_info:
+        vault_uri: "{{ keyvaulturi }}"
+        name: "{{ masLicenseKey }}"
+        client_id: "{{ akv_read_client_id }}"
+        secret: "{{ akv_read_client_secret }}"
+        tenant: "{{ tenant_id }}"
+        subscription_id: "{{ subscription_id }}"
+      register: mas_license_reg
+
 - name: Set secrets from key vault into reusable variables for common parameters
   ansible.builtin.set_fact:
     clientId: "{{ cluster_client_id['secrets'][0]['secret'] }}"
@@ -131,6 +164,13 @@
   ansible.builtin.set_fact:    
     installerClientId: "{{ installer_client_id['secrets'][0]['secret'] }}"
     installerClientSecret: "{{ installer_client_secret['secrets'][0]['secret'] }}"
+
+- name: Set secrets from key vault into reusable variables for MAS Installation
+  when: mas.prepare_install
+  ansible.builtin.set_fact:    
+    mas_entitlement: "{{ mas_entitlement_reg['secrets'][0]['secret'] }}"
+    mas_licenseid: "{{ mas_licenseid_reg['secrets'][0]['secret'] }}"
+    mas_license: "{{ mas_license_reg['secrets'][0]['secret'] | b64decode }}"
 
 - name: Check if cluster with same name already exists.
   azure.azcollection.azure_rm_openshiftmanagedcluster_info:
@@ -240,19 +280,7 @@
         allow_shared_key_access: true
         tags:  "{{ tags | items2dict(key_name='key', value_name='value') }}"
       register: sa
-    
-    # - name: Create share with NFS enabled protocols
-    #   azure.azcollection.azure_rm_storageshare:
-    #     name: "{{ storageaccount.file.nfs_sharename }}"
-    #     resource_group: "{{ storageaccount.resourcegroup }}"
-    #     subscription_id: "{{ installer.subscription_id }}"
-    #     client_id: "{{ installerClientId | default(omit) }}"
-    #     secret: "{{ installerClientSecret | default(omit) }}"
-    #     tenant: "{{ installer.tenant_id  }}"
-    #     account_name: "{{ storageaccount.name }}"
-    #     root_squash: RootSquash
-    #     enabled_protocols: NFS
-    
+        
     - name: Create private endpoint
       when: cluster.conditionals.create_network_vnet_and_subnets
       azure.azcollection.azure_rm_privateendpoint:
@@ -524,12 +552,22 @@
       ] | selectattr('condition', 'eq', true) | list }}
   no_log: True
 
-
 - name: Reconstruct ARO Deployment command
   ansible.builtin.set_fact:
     aro_command: "{{ aro_command }} --{{ item.param }} '{{ item.value }}'"
   when: item.value is defined and item.value != '' and item.condition
   with_items: "{{ optional_params }}"
+
+- name: Remove artefact directory and its content
+  ansible.builtin.file:
+    state: absent
+    path: artefacts
+
+- name: Create artefact directory 
+  ansible.builtin.file:
+    path: artefacts
+    state: directory
+    mode: '0755'
 
 - name: Save dynamically generated script artefact
   ansible.builtin.copy:
@@ -545,6 +583,7 @@
 - name: Cleanup Temporary Cluster Creation files
   ansible.builtin.file:
     path: pullsecret.txt
+    state: absent
 
 - name: Wait for cluster installation to complete
   ansible.builtin.debug:
@@ -988,6 +1027,20 @@
 - name: Find secret that ends with 'ingress'
   ansible.builtin.set_fact:
     ingress_secret: "{{ ingress_secrets.resources | json_query('[?ends_with(metadata.name, `ingress`)]') }}"
+
+- name: Prepare environment for MAS Installation
+  when: mas.prepare_install
+  block:
+    - name: Save MAS License from AKV to file using copy
+      ansible.builtin.copy:
+        content: "{{ mas_license }}"
+        dest: "{{ mas.license_file }}"
+        mode: '0644'
+    
+    - name: Ensure a line is replaced using a regex
+      ansible.builtin.template:
+        src: setenv-install.j2
+        dest: artefacts/setenv-install.sh
 
 - name: Debug the found secret
   ansible.builtin.debug:

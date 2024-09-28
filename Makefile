@@ -69,7 +69,8 @@ create-cluster:
 .PHONY: deploy-mas
 deploy-mas:
 	source $(VIRTUALENV)/bin/activate && \
-	ansible-playbook ibm.mas_devops.oneclick_core -v
+	source ansible/artefacts/setenv-install.sh && \
+	ansible-playbook ibm.mas_devops.oneclick_core
 
 # Target to delete the cluster
 .PHONY: delete-cluster
@@ -82,9 +83,3 @@ delete-cluster:
 recreate-cluster:
 	source $(VIRTUALENV)/bin/activate && \
 	ansible-playbook ansible/recreate-cluster.yaml
-
-.PHONY: test
-test:
-	source $(VIRTUALENV)/bin/activate && \
-	ansible-playbook ansible/mas-deployment.yaml
-

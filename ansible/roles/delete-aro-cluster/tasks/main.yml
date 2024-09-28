@@ -367,6 +367,11 @@
     - name: Delete Azure Policy Definition
       ansible.builtin.command: az policy definition delete --name {{ cluster.policy_definition }} --subscription "{{ installer.subscription_id }}"
 
+- name: Cleanup Temporary Cluster Creation files
+  ansible.builtin.file:
+    path: pullsecret.txt
+    state: absent
+
 - name: Cleanup Completion Message
   ansible.builtin.debug:
     msg: "Cleanup of cluster {{ cluster.name }} completed!"
