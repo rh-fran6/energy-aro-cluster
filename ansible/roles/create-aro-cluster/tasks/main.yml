@@ -1041,6 +1041,18 @@
       ansible.builtin.template:
         src: setenv-install.j2
         dest: artefacts/setenv-install.sh
+    
+    - name: Generate Login Script
+      ansible.builtin.template:
+        src: connect-script.j2
+        dest: artefacts/login-script.sh
+    
+    - name: Make login-script.sh executable
+      ansible.builtin.file:
+        path: artefacts/login-script.sh
+        mode: '0755'
+        state: file
+
 
 - name: Debug the found secret
   ansible.builtin.debug:
