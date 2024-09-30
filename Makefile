@@ -1,13 +1,3 @@
-# Use bash shell
-
-## Install these 2 first:
-# yum groupinstall "Development Tools"
-# dnf install git git-all 
-
-# az login --service-principal -u $CLIENT_ID -p $PASSWORD --tenant $TENANT
-# az login --tenant $TENANT
-# az account set --subscription $SUBSCRIPTION
-
 SHELL := /bin/bash
 
 # Default goal to be displayed when no target is specified
@@ -70,9 +60,8 @@ create-cluster:
 deploy-mas:
 	source $(VIRTUALENV)/bin/activate && \
 	source ansible/artefacts/setenv-install.sh && \
-	./artefacts/login-script.sh && \
+	./ansible/artefacts/login-script.sh && \
 	ansible-playbook ibm.mas_devops.oneclick_core
-
 
 # Target to delete the cluster
 .PHONY: delete-cluster
@@ -85,3 +74,14 @@ delete-cluster:
 recreate-cluster:
 	source $(VIRTUALENV)/bin/activate && \
 	ansible-playbook ansible/recreate-cluster.yaml
+
+# Delete Cluster, Create Cluster and Deploy MAS 
+.PHONY: redeploy
+redeploy:
+	source $(VIRTUALENV)/bin/activate && \
+	ansible-playbook ansible/delete-cluster.yaml && \
+	ansible-playbook ansible/create-cluster.yaml && \
+	source ansible/artefacts/setenv-install.sh && \
+	./ansible/artefacts/login-script.sh && \
+	ansible-playbook ibm.mas_devops.oneclick_core
+

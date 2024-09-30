@@ -1034,7 +1034,7 @@
     - name: Save MAS License from AKV to file using copy
       ansible.builtin.copy:
         content: "{{ mas_license }}"
-        dest: "{{ mas.license_file }}"
+        dest: "{{ mas.ansible_license_path }}"
         mode: '0644'
     
     - name: Ensure a line is replaced using a regex
@@ -1044,7 +1044,7 @@
     
     - name: Generate Login Script
       ansible.builtin.template:
-        src: connect-script.j2
+        src: login-script.j2
         dest: artefacts/login-script.sh
     
     - name: Make login-script.sh executable
