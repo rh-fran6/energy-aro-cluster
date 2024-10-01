@@ -24,6 +24,7 @@
   register: cluster_subscription_id
 
 - name: Read Cluster Service Principal from AKV - Client ID
+  when: cluster.conditionals.use_aro_sp
   azure.azcollection.azure_rm_keyvaultsecret_info:
     vault_uri: "{{ keyvaulturi }}"
     name: "{{ cluster_sp_id_key }}"
@@ -33,7 +34,8 @@
     subscription_id: "{{ subscription_id }}"
   register: cluster_client_id
 
-- name: Read Cluster Service Principal from AKV - Client Secret
+- name: Read Cluster Service Principal from AKV - Client Secret  
+  when: cluster.conditionals.use_aro_sp
   azure.azcollection.azure_rm_keyvaultsecret_info:
     vault_uri: "{{ keyvaulturi }}"
     name: "{{ cluster_sp_secret_key }}"
@@ -283,12 +285,16 @@
       register: az_net_rg
       until: az_net_rg.resourcegroups | length < 1
       retries: 120
-      delay: 5
+      delay: 5"
 
 - name: Read Service Principal details for cluster
-  when: cluster.conditionals.use_aro_sp and cluster.conditionals.assign_rbac_roles
+  when: cluster.conditionals.use_installer_sp
   azure.azcollection.azure_rm_adserviceprincipal_info:
     app_id: "{{ clientId }}"
+    subscription_id: "{{ installer.subscription_id }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
+    tenant: "{{ installer.tenant_id  }}"
   register: useraccounts
 
 - name: Remove 'Contributor' role from ARO Service Principal for the storage accountresource group

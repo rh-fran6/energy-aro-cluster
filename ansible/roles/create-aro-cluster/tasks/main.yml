@@ -64,7 +64,7 @@
   register: pull_secret
 
 - name: Read Installer Service Principal from AKV - Client ID
-  when: cluster.conditionals.install_with_sp
+  when: cluster.conditionals.use_aro_sp
   azure.azcollection.azure_rm_keyvaultsecret_info:
     vault_uri: "{{ keyvaulturi }}"
     name: "{{ installer_clientid }}"
@@ -75,7 +75,7 @@
   register: installer_client_id
 
 - name: Read Installer Service Principal from AKV - Client Secret
-  when: cluster.conditionals.install_with_sp
+  when: cluster.conditionals.use_aro_sp
   azure.azcollection.azure_rm_keyvaultsecret_info:
     vault_uri: "{{ keyvaulturi }}"
     name: "{{ installer_clientsecret }}"
@@ -160,7 +160,7 @@
     subscriptionId: "{{ cluster_subscription_id['secrets'][0]['secret'] }}"
 
 - name: Set secrets from key vault into reusable variables for SP based parameters
-  when: cluster.conditionals.install_with_sp
+  when: cluster.conditionals.use_installer_sp
   ansible.builtin.set_fact:    
     installerClientId: "{{ installer_client_id['secrets'][0]['secret'] }}"
     installerClientSecret: "{{ installer_client_secret['secrets'][0]['secret'] }}"
@@ -459,6 +459,10 @@
   when: cluster.conditionals.use_aro_sp and cluster.conditionals.assign_rbac_roles
   azure.azcollection.azure_rm_adserviceprincipal_info:
     app_id: "{{ clientId }}"
+    subscription_id: "{{ installer.subscription_id }}"
+    client_id: "{{ installerClientId | default(omit) }}"
+    secret: "{{ installerClientSecret | default(omit) }}"
+    tenant: "{{ installer.tenant_id  }}"
   register: useraccounts
     
 - name: Assign 'Contributor' role to ARO Service Principal for the storage accountresource group
