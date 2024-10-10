@@ -285,10 +285,10 @@
       register: az_net_rg
       until: az_net_rg.resourcegroups | length < 1
       retries: 120
-      delay: 5"
+      delay: 5
 
 - name: Read Service Principal details for cluster
-  when: cluster.conditionals.use_installer_sp
+  when: cluster.conditionals.use_aro_sp and cluster.conditionals.assign_rbac_roles
   azure.azcollection.azure_rm_adserviceprincipal_info:
     app_id: "{{ clientId }}"
     subscription_id: "{{ installer.subscription_id }}"
