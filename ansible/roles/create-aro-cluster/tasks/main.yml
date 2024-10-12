@@ -182,18 +182,18 @@
     name: "{{ cluster.name }}"
   register: _aro_check
 
-- name: Abort Cluster creation if cluster with same name exists
-  when: _aro_check.clusters != {}
-  block:
-    - name: Checking whether to Abort. Abort if cluster with similar name exists
-      ansible.builtin.debug:
-        msg:
-          - "Previous installation of cluster with name {{ cluster.name }} exists..."
-    - name: Fail Installation Attempt
-      ansible.builtin.fail:
-        msg: |
-          - Aborting {{ cluster.name }} cluster creation...
-          - Error: "{{ _aro_check.clusters }}"
+# - name: Abort Cluster creation if cluster with same name exists
+#   when: _aro_check.clusters != {}
+#   block:
+#     - name: Checking whether to Abort. Abort if cluster with similar name exists
+#       ansible.builtin.debug:
+#         msg:
+#           - "Previous installation of cluster with name {{ cluster.name }} exists..."
+#     - name: Fail Installation Attempt
+#       ansible.builtin.fail:
+#         msg: |
+#           - Aborting {{ cluster.name }} cluster creation...
+#           - Error: "{{ _aro_check.clusters }}"
 
 - name: Create Network resources if cluster.conditionals.create_network_vnet_and_subnets is set to true
   when: cluster.conditionals.create_network_vnet_and_subnets
@@ -578,11 +578,11 @@
     content: "{{ aro_command }}"
     dest: artefacts/ansibleruncommand.sh
 
-- name: Run the dynamically built command for ARO cluster creation
-  ansible.builtin.command: "{{ aro_command }}"
-  register: cluster_create
-  changed_when: cluster_create.rc != 0
-  when: ( not _aro_check.clusters )
+# - name: Run the dynamically built command for ARO cluster creation
+#   ansible.builtin.command: "{{ aro_command }}"
+#   register: cluster_create
+#   changed_when: cluster_create.rc != 0
+#   when: ( not _aro_check.clusters )
 
 - name: Cleanup Temporary Cluster Creation files
   ansible.builtin.file:
@@ -1015,8 +1015,8 @@
         release_namespace: platform
         create_namespace: true
       until: (appBootstrap.status is defined and appBootstrap.status.status == "deployed")
-      retries: 60  
-      delay: 2 
+      retries: 120  
+      delay: 10 
 
 - name: Read Default OpenShift Ingress Secret
   kubernetes.core.k8s_info:
