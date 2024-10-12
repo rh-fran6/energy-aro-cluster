@@ -85,7 +85,7 @@ cluster:
     control_subnet_name: master-subnet
     worker_subnet_name: worker-subnet
     vnet_rg: aro-main
-    outbound_type: UserDefinedRouting #Loadbalancer  
+    outbound_type: Loadbalancer  # UserDefinedRouting 
     ingress_visibility: Private 
     api_visibility: Private
     pod_cidr: 10.128.0.0/14
