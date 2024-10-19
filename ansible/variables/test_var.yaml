@@ -9,9 +9,6 @@ cluster_sp_object_id_key: spObjectId
 pull_secret_akv_key: pullSecret
 installer_clientid: ID #AccntclientId # 
 installer_clientsecret: SECRET # AccntclientSecret  # 
-imageRegistryHostnameKey: acrName
-imageRegistryUsernameKey: acrUsername
-imageRegistryPasswordKey: acrPassword
 masEntitlementKey: masEntitlement
 masLicenseIdKey: masLicenseId
 masLicenseKey: masLicense
@@ -56,8 +53,8 @@ vnet:
 cluster:
   conditionals:
     create_network_vnet_and_subnets: true
-    specify_custom_domain: True
-    specify_version: True
+    specify_custom_domain: true
+    specify_version: true
     specify_disk_encryption_set: False
     specify_tags: True
     encrypt_master_hosts: False
@@ -85,9 +82,9 @@ cluster:
     control_subnet_name: master-subnet
     worker_subnet_name: worker-subnet
     vnet_rg: aro-main
-    outbound_type: Loadbalancer  # UserDefinedRouting 
-    ingress_visibility: Private 
-    api_visibility: Private
+    outbound_type: Loadbalancer   #UserDefinedRouting
+    ingress_visibility: Public 
+    api_visibility: Public
     pod_cidr: 10.128.0.0/14
     service_cidr: 172.32.0.0/16  
 
@@ -123,11 +120,14 @@ integrations:
   imagemirror:
     enabled: true
   imageregistry:
-    add: true
-    secretname: mas-registry-secret-name
-    email: mymail@mail.com
+    private: true
+    private_registry_email: mymail@mail.com
+    private_secret_name: registry-secret-name
+    privateImageRegistryHostnameKey: acrName
+    pprivateImageRegistryUsernameKey: acrUsername
+    privateImageRegistryPasswordKey: acrPassword
   certmgr:
-    enabled: true
+    enabled: false
     dnszone_clusterissuer:  azurednszone-letsencrypt
     dnszone_secret_name: cert-manager-secret
     dnszone_secret_key: certmgrDNS
@@ -138,9 +138,14 @@ integrations:
     dnszone_rg: openenv-s9lk8
     dnszone_name: s9lk8.azure.redhatworkshops.io  
   ossm:
-    create: true
-
-
+    create: false
+  gitrepo:
+    private: true
+    patKey: githubPat
+    reposecret_name: private-repository-name
+    repo_url: https://github.com/rh-fran6/priv-repo
+    custom_cert: true
+    custom_cert_key: privRepoCert
 
 storageaccount:
   name: masclusterstorageaccount
