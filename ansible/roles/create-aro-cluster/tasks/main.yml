@@ -85,38 +85,61 @@
     subscription_id: "{{ subscription_id }}"
   register: installer_client_secret
 
-- name: Read Image Registry Hostname from AKV
-  when: integrations.imageregistry.add
-  azure.azcollection.azure_rm_keyvaultsecret_info:
-    vault_uri: "{{ keyvaulturi }}"
-    name: "{{ imageRegistryHostnameKey }}"
-    client_id: "{{ akv_read_client_id }}"
-    secret: "{{ akv_read_client_secret }}"
-    tenant: "{{ tenant_id }}"
-    subscription_id: "{{ subscription_id }}"
-  register: image_registry_hostname
+- name: Read Private Image Registry Credentials from AKV
+  when: integrations.imageregistry.private
+  block:
+    - name: Read Image Registry Hostname from AKV
+      azure.azcollection.azure_rm_keyvaultsecret_info:
+        vault_uri: "{{ keyvaulturi }}"
+        name: "{{ integrations.imageregistry.privateImageRegistryHostnameKey }}"
+        client_id: "{{ akv_read_client_id }}"
+        secret: "{{ akv_read_client_secret }}"
+        tenant: "{{ tenant_id }}"
+        subscription_id: "{{ subscription_id }}"
+      register: image_registry_hostname
+    
+    - name: Read Image Registry Username from AKV
+      azure.azcollection.azure_rm_keyvaultsecret_info:
+        vault_uri: "{{ keyvaulturi }}"
+        name: "{{ integrations.imageregistry.privateImageRegistryUsernameKey }}"
+        client_id: "{{ akv_read_client_id }}"
+        secret: "{{ akv_read_client_secret }}"
+        tenant: "{{ tenant_id }}"
+        subscription_id: "{{ subscription_id }}"
+      register: image_registry_username
+    
+    - name: Read Image Registry Password from AKV
+      azure.azcollection.azure_rm_keyvaultsecret_info:
+        vault_uri: "{{ keyvaulturi }}"
+        name: "{{ integrations.imageregistry.privateImageRegistryPasswordKey }}"
+        client_id: "{{ akv_read_client_id }}"
+        secret: "{{ akv_read_client_secret }}"
+        tenant: "{{ tenant_id }}"
+        subscription_id: "{{ subscription_id }}"
+      register: image_registry_password
 
-- name: Read Image Registry Username from AKV
-  when: integrations.imageregistry.add
+- name: Read Git Repository PAT from AKV
+  when: integrations.gitrepo.private
   azure.azcollection.azure_rm_keyvaultsecret_info:
     vault_uri: "{{ keyvaulturi }}"
-    name: "{{ imageRegistryUsernameKey }}"
+    name: "{{ integrations.gitrepo.patKey }}"
     client_id: "{{ akv_read_client_id }}"
     secret: "{{ akv_read_client_secret }}"
     tenant: "{{ tenant_id }}"
     subscription_id: "{{ subscription_id }}"
-  register: image_registry_username
+  register: git_repo_pat
 
-- name: Read Image Registry Password from AKV
-  when: integrations.imageregistry.add
+- name: Read Private Git Repository Certificate from AKV
+  when: integrations.gitrepo.custom_cert
   azure.azcollection.azure_rm_keyvaultsecret_info:
     vault_uri: "{{ keyvaulturi }}"
-    name: "{{ imageRegistryPasswordKey }}"
+    name: "{{ integrations.gitrepo.custom_cert_key }}"
     client_id: "{{ akv_read_client_id }}"
     secret: "{{ akv_read_client_secret }}"
     tenant: "{{ tenant_id }}"
     subscription_id: "{{ subscription_id }}"
-  register: image_registry_password
+  register: repo_custom_cert
+  
 
 - name: Read MAS License Secrets 
   when: mas.prepare_install
@@ -182,18 +205,18 @@
     name: "{{ cluster.name }}"
   register: _aro_check
 
-# - name: Abort Cluster creation if cluster with same name exists
-#   when: _aro_check.clusters != {}
-#   block:
-#     - name: Checking whether to Abort. Abort if cluster with similar name exists
-#       ansible.builtin.debug:
-#         msg:
-#           - "Previous installation of cluster with name {{ cluster.name }} exists..."
-#     - name: Fail Installation Attempt
-#       ansible.builtin.fail:
-#         msg: |
-#           - Aborting {{ cluster.name }} cluster creation...
-#           - Error: "{{ _aro_check.clusters }}"
+- name: Abort Cluster creation if cluster with same name exists
+  when: _aro_check.clusters != {}
+  block:
+    - name: Checking whether to Abort. Abort if cluster with similar name exists
+      ansible.builtin.debug:
+        msg:
+          - "Previous installation of cluster with name {{ cluster.name }} exists..."
+    - name: Fail Installation Attempt
+      ansible.builtin.fail:
+        msg: |
+          - Aborting {{ cluster.name }} cluster creation...
+          - Error: "{{ _aro_check.clusters }}"
 
 - name: Create Network resources if cluster.conditionals.create_network_vnet_and_subnets is set to true
   when: cluster.conditionals.create_network_vnet_and_subnets
@@ -578,11 +601,11 @@
     content: "{{ aro_command }}"
     dest: artefacts/ansibleruncommand.sh
 
-# - name: Run the dynamically built command for ARO cluster creation
-#   ansible.builtin.command: "{{ aro_command }}"
-#   register: cluster_create
-#   changed_when: cluster_create.rc != 0
-#   when: ( not _aro_check.clusters )
+- name: Run the dynamically built command for ARO cluster creation
+  ansible.builtin.command: "{{ aro_command }}"
+  register: cluster_create
+  changed_when: cluster_create.rc != 0
+  when: ( not _aro_check.clusters )
 
 - name: Cleanup Temporary Cluster Creation files
   ansible.builtin.file:
@@ -775,6 +798,72 @@
             path: /spec/plugins/-
             value: gitops-plugin
 
+    - name: Conditionally create private git repository credentials 
+      when: "{{ integrations.gitrepo.private }}"
+      kubernetes.core.k8s:
+        state: present
+        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+        username: "{{ userName.stdout }}"
+        host: "{{ apiUrl.stdout }}"
+        validate_certs: false
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "{{ integrations.gitrepo.reposecret_name }}"
+            namespace: openshift-gitops
+            labels:
+              argocd.argoproj.io/secret-type: repository
+          data:
+            url: "{{ integrations.gitrepo.repo_url | b64encode }}"
+            password: "{{ git_repo_pat['secrets'][0]['secret'] | b64encode }}"
+            username: "{{ 'not-used' | b64encode }}"
+            type: "{{ 'git' | b64encode }}"
+
+    - name: Conditionally create private repo certificate
+      when: "{{ integrations.gitrepo.custom_cert }}"
+      kubernetes.core.k8s:
+        state: present
+        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+        username: "{{ userName.stdout }}"
+        host: "{{ apiUrl.stdout }}"
+        validate_certs: false
+        definition:
+          kind: ConfigMap
+          apiVersion: v1
+          data:
+            ca-bundle.crt: | 
+              "{{ repo_custom_cert['secrets'][0]['secret'] }}"
+          metadata:
+            name: cluster-root-ca-bundle 
+            namespace: openshift-gitops
+
+    - name: Conditionally update argocd CRD instance 
+      when: "{{ integrations.gitrepo.custom_cert }}"
+      kubernetes.core.k8s:
+        state: present
+        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+        username: "{{ userName.stdout }}"
+        host: "{{ apiUrl.stdout }}"
+        validate_certs: false
+        definition:
+          kind: ArgoCD
+          apiVersion: argoproj.io/v1alpha1
+          metadata:
+            name: openshift-gitops
+            namespace: openshift-gitops
+          spec:
+            repo:
+              volumeMounts:
+              - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+                subPath: ca-bundle.crt
+                name: cluster-root-ca-bundle
+              volumes:
+                - configMap:
+                    name: cluster-root-ca-bundle
+                  name: cluster-root-ca-bundle
+                  optional: true
+
     - name: Create External Secrets Operator Read Secret 
       kubernetes.core.k8s:
         state: present
@@ -792,6 +881,58 @@
           data:
             ClientID: "{{ akv_read_client_id | b64encode }}"
             ClientSecret: "{{ akv_read_client_secret | b64encode }}"
+
+- name: Create Private Image Registry Integration Resources
+  when: integrations.imageregistry.private
+  block:
+    - name: Set dockerconfigjson fact
+      ansible.builtin.set_fact:
+        dockerconfigjson: |
+          {
+            "auths": {
+              "{{ image_registry_hostname['secrets'][0]['secret'] }}": {
+                "email": "{{ integrations.imageregistry.private_registry_email }}",
+                "auth": "{{ image_registry_username['secrets'][0]['secret']  }}:{{ image_registry_password['secrets'][0]['secret']  }} | b64encode }}"
+              }
+            }
+          }
+    
+    - name: Base64 encode dockerconfigjson
+      ansible.builtin.set_fact:
+        dockerconfigjson_b64: "{{ dockerconfigjson | b64encode }}"
+    
+    - name: Create Kubernetes Image registry secret
+      kubernetes.core.k8s:
+        state: present
+        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+        username: "{{ userName.stdout }}"
+        host: "{{ apiUrl.stdout }}"
+        validate_certs: false
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "{{ integrations.imageregistry.private_secret_tname }}" 
+            namespace: default
+          type: kubernetes.io/dockerconfigjson
+          data:
+            .dockerconfigjson: "{{ dockerconfigjson_b64 }}"
+    
+    - name: Create Service Account with Image pull token
+      kubernetes.core.k8s:
+        state: present
+        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+        username: "{{ userName.stdout }}"
+        host: "{{ apiUrl.stdout }}"
+        validate_certs: false
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: default
+            namespace: default
+          imagePullSecrets:
+            - name: "{{ integrations.imageregistry.private_secret_tname }}"   
 
 - name: Set up Entra ID integration
   when: integrations.entraid.add
@@ -946,7 +1087,7 @@
             sourceNamespace: openshift-marketplace
 
 - name: Enable Pull Secret Integrations
-  when: integrations.insights.enabled or integrations.imageregistry.add
+  when: integrations.insights.enabled 
   block:
     - name: Retrieve Cluster Pull Secret
       kubernetes.core.k8s_info:
@@ -961,12 +1102,10 @@
       register: secret_data
 
     - name: Extract secret value
-      when: integrations.insights.enabled
       set_fact:
         cloud_secret_value: "{{ secret_data.resources[0].data['.dockerconfigjson'] | b64decode }}"
     
     - name: Define Insights integration data structure - pre-merge
-      when: integrations.insights.enabled
       ansible.builtin.set_fact:
         insight_data:
           auths:
@@ -975,12 +1114,10 @@
               email: "{{ pullSecret['auths']['cloud.openshift.com']['email'] }}"
 
     - name: Merge Insight Data into Pull Secret
-      when: integrations.insights.enabled
       ansible.builtin.set_fact:
         merged_auths: "{{ cloud_secret_value.auths | combine(insight_data.auths, recursive=True) }}"
     
     - name: Replace .dockerconfigjson field of the pull secret
-      when: integrations.insights.enabled
       kubernetes.core.k8s:
         api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
         username: "{{ userName.stdout }}"

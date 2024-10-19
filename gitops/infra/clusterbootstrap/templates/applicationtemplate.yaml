@@ -1,4 +1,4 @@
-
+{{ $repository := .Values.integrations.gitrepo.repo_url }}
 {{ $appNamespace := .Values.global.openshiftGitopsNamespace }}
 {{- range $key, $value := .Values.applications }}
 apiVersion: argoproj.io/v1alpha1
@@ -19,7 +19,7 @@ spec:
     namespace: {{ .applicationNamespace }}  
   project: {{ .applicationProject }}
   sources:
-    - repoURL: {{ .repoUrl }}
+    - repoURL: {{ $repository }}
       targetRevision: {{ .branch }}
       path: {{ .appPath }}
       ref: values

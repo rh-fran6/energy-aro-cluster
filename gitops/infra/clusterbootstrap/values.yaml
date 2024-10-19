@@ -5,7 +5,8 @@ global:
 applications:
   #  Applications in platform-admin namespace
   - appName: infra-bootstrap
-    repoUrl: https://github.com/rh-fran6/ansible-aro-bootstrap.git
+    # repoUrl: https://github.com/rh-fran6/ansible-aro-bootstrap.git
+    # repoUrl: https://github.com/rh-fran6/priv-repo
     branch: main
     argocdNamespace: openshift-gitops
     applicationProject: default
@@ -14,7 +15,8 @@ applications:
     imageName: ""
   
   - appName: operator-installs
-    repoUrl: https://github.com/rh-fran6/ansible-aro-bootstrap.git
+    # repoUrl: https://github.com/rh-fran6/ansible-aro-bootstrap.git
+    # repoUrl: https://github.com/rh-fran6/priv-repo
     branch: main
     argocdNamespace: openshift-gitops
     applicationProject: default
