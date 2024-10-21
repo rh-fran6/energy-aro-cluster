@@ -206,7 +206,7 @@
   register: _aro_check
 
 - name: Abort Cluster creation if cluster with same name exists
-  when: _aro_check.clusters != {}
+  when: _aro_check.clusters != {} and cluster.conditionals.install_cluster
   block:
     - name: Checking whether to Abort. Abort if cluster with similar name exists
       ansible.builtin.debug:
@@ -605,7 +605,7 @@
   ansible.builtin.command: "{{ aro_command }}"
   register: cluster_create
   changed_when: cluster_create.rc != 0
-  when: ( not _aro_check.clusters )
+  when: ( not _aro_check.clusters  and cluster.conditionals.install_cluster )
 
 - name: Cleanup Temporary Cluster Creation files
   ansible.builtin.file:
