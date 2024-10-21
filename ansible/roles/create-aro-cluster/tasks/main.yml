@@ -696,12 +696,6 @@
         dest: /opt/homebrew/bin/aro-1-creds
         mode: '0755'
 
-- debug:
-    msg:
-      - username: "{{ userName.stdout }}"
-      - password: "{{ passWord.stdout }}"
-      - host: "{{ apiUrl.stdout }}"
-
 - name: Log in to OpenShift (obtain access token)
   register: openshift_auth_results
   community.okd.openshift_auth:
