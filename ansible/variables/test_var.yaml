@@ -124,7 +124,7 @@ integrations:
     private_registry_email: mymail@mail.com
     private_secret_name: registry-secret-name
     privateImageRegistryHostnameKey: acrName
-    pprivateImageRegistryUsernameKey: acrUsername
+    privateImageRegistryUsernameKey: acrUsername
     privateImageRegistryPasswordKey: acrPassword
   certmgr:
     enabled: false
@@ -144,7 +144,9 @@ integrations:
     patKey: githubPat
     reposecret_name: private-repository-name
     repo_url: https://github.com/rh-fran6/priv-repo
-    custom_cert: true
+    repo_branch: main
+    repo_path: gitops/infra
+    custom_cert: false
     custom_cert_key: privRepoCert
 
 storageaccount:

@@ -1,4 +1,4 @@
-{{ $repository := .Values.integrations.gitrepo.repo_url }}
+
 {{ $appNamespace := .Values.global.openshiftGitopsNamespace }}
 {{- range $key, $value := .Values.applications }}
 apiVersion: argoproj.io/v1alpha1
@@ -19,13 +19,14 @@ spec:
     namespace: {{ .applicationNamespace }}  
   project: {{ .applicationProject }}
   sources:
-    - repoURL: {{ $repository }}
+    - repoURL: {{ .repoUrl }}
       targetRevision: {{ .branch }}
       path: {{ .appPath }}
       ref: values
       helm:
         valueFiles:
-          - $values/ansible/variables/test_var.yaml         
+          - $values/ansible/variables/test_var.yaml 
+
   ignoreDifferences:   
     - group: ""
       kind: ServiceAccount
@@ -35,7 +36,10 @@ spec:
         - /imagePullSecrets
         - /secrets
   syncPolicy:
-    automated: {}
+    automated:
+      allowEmpty: true
+      prune: true
+      selfHeal: true
     retry:
       limit: 20
     managedNamespaceMetadata:
