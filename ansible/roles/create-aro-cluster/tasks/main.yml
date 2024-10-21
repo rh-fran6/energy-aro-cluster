@@ -696,6 +696,12 @@
         dest: /opt/homebrew/bin/aro-1-creds
         mode: '0755'
 
+- debug:
+    msg:
+      - username: "{{ userName.stdout }}"
+      - password: "{{ passWord.stdout }}"
+      - host: "{{ apiUrl.stdout }}"
+
 - name: Log in to OpenShift (obtain access token)
   register: openshift_auth_results
   community.okd.openshift_auth:
@@ -703,8 +709,8 @@
     password: "{{ passWord.stdout }}"
     host: "{{ apiUrl.stdout }}"
     validate_certs: false
-  retries: 30                 
-  delay: 2                 
+  retries: 300                 
+  delay: 10                 
   until: openshift_auth_results.openshift_auth.api_key is defined
 
 - name: Bootstrap OpenShift GitOps
@@ -726,6 +732,32 @@
               openshift.io/display-name: "OpenShift GitOps Operator"
             labels:
               openshift.io/cluster-monitoring: 'true'
+
+- name: Bootstrap OpenShift GitOps
+  when: integrations.gitops.add
+  block:
+    - name: Remove values file if it exists
+      ansible.builtin.file:
+        path: ../gitops/infra/clusterbootstrap/values.yaml
+        state: absent
+
+    - name: Generate Helm Chart Values File
+      ansible.builtin.template:
+        src: clusterbootstrap-values.j2
+        dest: ../gitops/infra/clusterbootstrap/values.yaml
+
+    - name: Create OpenShift GitOps Namespace
+      kubernetes.core.k8s:
+        state: present
+        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+        username: "{{ userName.stdout }}"
+        host: "{{ apiUrl.stdout }}"
+        validate_certs: false
+        definition:
+          kind: Project
+          apiVersion: project.openshift.io/v1
+          metadata:
+            name: openshift-gitops
 
     - name: Create OpenShift GitOps Operator Group
       kubernetes.core.k8s:
@@ -799,7 +831,7 @@
             value: gitops-plugin
 
     - name: Conditionally create private git repository credentials 
-      when: "{{ integrations.gitrepo.private }}"
+      when: integrations.gitrepo.private
       kubernetes.core.k8s:
         state: present
         api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
@@ -821,7 +853,7 @@
             type: "{{ 'git' | b64encode }}"
 
     - name: Conditionally create private repo certificate
-      when: "{{ integrations.gitrepo.custom_cert }}"
+      when: integrations.gitrepo.custom_cert
       kubernetes.core.k8s:
         state: present
         api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
@@ -839,7 +871,7 @@
             namespace: openshift-gitops
 
     - name: Conditionally update argocd CRD instance 
-      when: "{{ integrations.gitrepo.custom_cert }}"
+      when: integrations.gitrepo.custom_cert
       kubernetes.core.k8s:
         state: present
         api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
@@ -887,20 +919,16 @@
   block:
     - name: Set dockerconfigjson fact
       ansible.builtin.set_fact:
-        dockerconfigjson: |
+        dockerconfigjson_data: |
           {
             "auths": {
               "{{ image_registry_hostname['secrets'][0]['secret'] }}": {
                 "email": "{{ integrations.imageregistry.private_registry_email }}",
-                "auth": "{{ image_registry_username['secrets'][0]['secret']  }}:{{ image_registry_password['secrets'][0]['secret']  }} | b64encode }}"
+                "auth": "{{ (image_registry_username['secrets'][0]['secret'] + ':' + image_registry_password['secrets'][0]['secret']) | b64encode }}"
               }
             }
           }
-    
-    - name: Base64 encode dockerconfigjson
-      ansible.builtin.set_fact:
-        dockerconfigjson_b64: "{{ dockerconfigjson | b64encode }}"
-    
+
     - name: Create Kubernetes Image registry secret
       kubernetes.core.k8s:
         state: present
@@ -912,11 +940,11 @@
           apiVersion: v1
           kind: Secret
           metadata:
-            name: "{{ integrations.imageregistry.private_secret_tname }}" 
+            name: "{{ integrations.imageregistry.private_secret_name }}" 
             namespace: default
           type: kubernetes.io/dockerconfigjson
           data:
-            .dockerconfigjson: "{{ dockerconfigjson_b64 }}"
+            .dockerconfigjson: "{{ dockerconfigjson_data | tojson | b64encode }}"
     
     - name: Create Service Account with Image pull token
       kubernetes.core.k8s:
@@ -932,7 +960,7 @@
             name: default
             namespace: default
           imagePullSecrets:
-            - name: "{{ integrations.imageregistry.private_secret_tname }}"   
+            - name: "{{ integrations.imageregistry.private_secret_name }}"   
 
 - name: Set up Entra ID integration
   when: integrations.entraid.add
@@ -1154,6 +1182,11 @@
       until: (appBootstrap.status is defined and appBootstrap.status.status == "deployed")
       retries: 120  
       delay: 10 
+
+    - name: Remove values from install directory
+      ansible.builtin.file:
+        path: ../gitops/infra/clusterbootstrap/values.yaml
+        state: absent
 
 - name: Read Default OpenShift Ingress Secret
   kubernetes.core.k8s_info:
