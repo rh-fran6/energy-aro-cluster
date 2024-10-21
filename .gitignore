@@ -8,5 +8,3 @@ ansible/artefacts/*
 ansible/pullsecret.txt
 *pullsecret*
 *pull-secret*
-*common_var*
-*test_var*

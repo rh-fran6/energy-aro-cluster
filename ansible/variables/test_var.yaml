@@ -82,7 +82,7 @@ cluster:
     control_subnet_name: master-subnet
     worker_subnet_name: worker-subnet
     vnet_rg: aro-main
-    outbound_type: Loadbalancer   #UserDefinedRouting
+    outbound_type: Loadbalancer  #UserDefinedRouting
     ingress_visibility: Public 
     api_visibility: Public
     pod_cidr: 10.128.0.0/14
