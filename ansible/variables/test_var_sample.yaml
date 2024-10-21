@@ -9,9 +9,6 @@ cluster_sp_object_id_key: spObjectId
 pull_secret_akv_key: pullSecret
 installer_clientid: AccntclientId # ID #
 installer_clientsecret: AccntclientSecret  # SECRET #
-imageRegistryHostnameKey: acrName
-imageRegistryUsernameKey: acrUsername
-imageRegistryPasswordKey: acrPassword
 masEntitlementKey: masEntitlement
 masLicenseIdKey: masLicenseId
 masLicenseKey: masLicense
@@ -47,10 +44,10 @@ vnet:
   address_cidr: 10.0.0.0/22
   control_plane: 
     name: mas-aro-cluster-control-subnet
-    address_cidr: 10.0.0.0/23
+    address_cidr: 10.0.0.0/24
   worker_plane:
     name: mas-aro-cluster-worker-subnet
-    address_cidr: 10.0.2.0/23
+    address_cidr: 10.0.2.0/24
 
 # outbound-type: Loadbalancer|UserDefinedRouting
 cluster:
@@ -125,9 +122,21 @@ integrations:
   imagemirror:
     enabled: true
   imageregistry:
-    add: true
-    secretname: mas-registry-secret-name
-    email: mymail@mail.com
+    private: true
+    private_registry_email: mymail@mail.com
+    private_secret_name: registry-secret-name
+    privateImageRegistryHostnameKey: acrName
+    privateImageRegistryUsernameKey: acrUsername
+    privateImageRegistryPasswordKey: acrPassword
+  gitrepo:
+    private: true
+    patKey: githubPat
+    reposecret_name: private-repository-name
+    repo_url: https://github.com/rh-fran6/priv-repo
+    repo_branch: main
+    repo_path: gitops/infra
+    custom_cert: false
+    custom_cert_key: privRepoCert
 
 storageaccount:
   name: masclusterstorageaccount

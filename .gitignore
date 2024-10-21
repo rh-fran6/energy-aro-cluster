@@ -1,5 +1,6 @@
 venv-aro/*
 ansible/variables/common_var.yaml
+ansible/variables/test_var.yaml
 .vscode
 ansibel/.vscode/*
 ansible.cfg
