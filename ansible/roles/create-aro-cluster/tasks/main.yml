@@ -707,6 +707,25 @@
   delay: 10                 
   until: openshift_auth_results.openshift_auth.api_key is defined
 
+- name: Conditionally create Egress IPs
+  when: egressip.enabled
+  kubernetes.core.k8s:
+    state: present
+    api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+    username: "{{ userName.stdout }}"
+    host: "{{ apiUrl.stdout }}"
+    validate_certs: false
+    definition:
+      apiVersion: k8s.ovn.org/v1
+      kind: EgressIP      
+      metadata:
+        name: egressips-prod  
+      spec:                        
+        egressIPs: "{{ egressip.ip_addresses }}"                                      
+        namespaceSelector:                                
+          matchLabels:                       
+            kubernetes.io/metadata.name: openshift-gitops
+
 - name: Bootstrap OpenShift GitOps
   when: integrations.gitops.add
   block:
@@ -846,7 +865,12 @@
             username: "{{ 'not-used' | b64encode }}"
             type: "{{ 'git' | b64encode }}"
 
-    - name: Conditionally create private repo certificate
+    # - name: Decode the file content and remove quotes
+    #   set_fact:
+    #     decoded_content: "{{ repo_custom_cert['secrets'][0]['secret'] | b64decode | replace('\"', '') }}"   
+    
+
+    - name: Conditionally create private repo secret
       when: integrations.gitrepo.custom_cert
       kubernetes.core.k8s:
         state: present
@@ -855,14 +879,32 @@
         host: "{{ apiUrl.stdout }}"
         validate_certs: false
         definition:
-          kind: ConfigMap
           apiVersion: v1
-          data:
-            ca-bundle.crt: | 
-              "{{ repo_custom_cert['secrets'][0]['secret'] }}"
+          kind: Secret
           metadata:
-            name: cluster-root-ca-bundle 
+            name: cluster-root-ca-bundle
             namespace: openshift-gitops
+          type: Opaque
+          data:
+            ca-bundle.crt: "{{ repo_custom_cert['secrets'][0]['secret'] }}"
+
+    # - name: Conditionally create private repo certificate
+    #   when: integrations.gitrepo.custom_cert
+    #   kubernetes.core.k8s:
+    #     state: present
+    #     api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+    #     username: "{{ userName.stdout }}"
+    #     host: "{{ apiUrl.stdout }}"
+    #     validate_certs: false
+    #     definition:
+    #       kind: ConfigMap
+    #       apiVersion: v1
+    #       data:
+    #         ca-bundle.crt: | 
+    #           "{{ decoded_content | indent(4, 'none') }}"
+    #       metadata:
+    #         name: cluster-root-ca-bundle 
+    #         namespace: openshift-gitops
 
     - name: Conditionally update argocd CRD instance 
       when: integrations.gitrepo.custom_cert
@@ -874,7 +916,7 @@
         validate_certs: false
         definition:
           kind: ArgoCD
-          apiVersion: argoproj.io/v1alpha1
+          apiVersion: argoproj.io/v1beta1
           metadata:
             name: openshift-gitops
             namespace: openshift-gitops
@@ -885,10 +927,13 @@
                 subPath: ca-bundle.crt
                 name: cluster-root-ca-bundle
               volumes:
-                - configMap:
-                    name: cluster-root-ca-bundle
+                - secret:
+                    secretName: cluster-root-ca-bundle
                   name: cluster-root-ca-bundle
-                  optional: true
+                # - configMap:
+                #     name: cluster-root-ca-bundle
+                #   name: cluster-root-ca-bundle
+                #   optional: true
 
     - name: Create External Secrets Operator Read Secret 
       kubernetes.core.k8s:

@@ -52,18 +52,19 @@ vnet:
 # outbound-type: Loadbalancer|UserDefinedRouting
 cluster:
   conditionals:
+    install_cluster: true
     create_network_vnet_and_subnets: true
-    specify_custom_domain: True
-    specify_version: True
+    specify_custom_domain: true
+    specify_version: true
     specify_disk_encryption_set: False
     specify_tags: True
     encrypt_master_hosts: False
     encrypt_worker_hosts: False
     enable_preconfigured_nsg: False
-    create_azure_policy_for_tags: True
+    create_azure_policy_for_tags: false
     enable_fips: False
     use_aro_sp: True
-    use_installer_sp: true
+    use_installer_sp: false
     create_cluster_resource_group: true
     assign_rbac_roles: true
   name: mas-aro-cluster
@@ -166,6 +167,13 @@ imagemirror:
   - source: ghcr.io/grafana/grafana-operator
     mirror: 
       - acr.com/grafana/grafana-operator
+
+egressip:
+  enabled: true
+  ip_addresses:
+    - 10.0.2.251
+    - 10.0.2.252
+    - 10.0.2.253
 
 autoscaler:
   ## Bring up cluster when value is false, then change to true and update machineset list 
