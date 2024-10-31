@@ -930,10 +930,6 @@
                 - secret:
                     secretName: cluster-root-ca-bundle
                   name: cluster-root-ca-bundle
-                # - configMap:
-                #     name: cluster-root-ca-bundle
-                #   name: cluster-root-ca-bundle
-                #   optional: true
 
     - name: Create External Secrets Operator Read Secret 
       kubernetes.core.k8s:
@@ -979,27 +975,27 @@
           apiVersion: v1
           kind: Secret
           metadata:
-            name: "{{ integrations.imageregistry.private_secret_name }}" 
-            namespace: default
+            name: pull-secret #"{{ integrations.imageregistry.private_secret_name }}" 
+            namespace: openshift-config
           type: kubernetes.io/dockerconfigjson
           data:
             .dockerconfigjson: "{{ dockerconfigjson_data | tojson | b64encode }}"
     
-    - name: Create Service Account with Image pull token
-      kubernetes.core.k8s:
-        state: present
-        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
-        username: "{{ userName.stdout }}"
-        host: "{{ apiUrl.stdout }}"
-        validate_certs: false
-        definition:
-          apiVersion: v1
-          kind: ServiceAccount
-          metadata:
-            name: default
-            namespace: default
-          imagePullSecrets:
-            - name: "{{ integrations.imageregistry.private_secret_name }}"   
+    # - name: Create Service Account with Image pull token
+    #   kubernetes.core.k8s:
+    #     state: present
+    #     api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+    #     username: "{{ userName.stdout }}"
+    #     host: "{{ apiUrl.stdout }}"
+    #     validate_certs: false
+    #     definition:
+    #       apiVersion: v1
+    #       kind: ServiceAccount
+    #       metadata:
+    #         name: default
+    #         namespace: default
+    #       imagePullSecrets:
+    #         - name: "{{ integrations.imageregistry.private_secret_name }}"   
 
 - name: Set up Entra ID integration
   when: integrations.entraid.add
