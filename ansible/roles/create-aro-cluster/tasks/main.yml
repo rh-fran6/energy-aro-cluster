@@ -828,7 +828,7 @@
         api_version: operator.openshift.io/v1
         name: cluster
   
-    - name: Apply multiple patch operations to an existing cluster Console
+    - name: Apply Gitops patch operations to an existing cluster Console
       when: "('plugins' not in console_plugin.resources[0].spec) or ('gitops-plugin' not in console_plugin.resources[0].spec.plugins)"
       kubernetes.core.k8s_json_patch:
         api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
@@ -1133,6 +1133,32 @@
             name: cluster-logging 
             source: redhat-operators 
             sourceNamespace: openshift-marketplace
+
+    - name: Read openshift console object called cluster
+      register: console_plugin_logging
+      kubernetes.core.k8s_info:
+        kind: Console
+        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+        username: "{{ userName.stdout }}"
+        host: "{{ apiUrl.stdout }}"
+        validate_certs: false
+        api_version: operator.openshift.io/v1
+        name: cluster
+  
+    - name: Apply logging patch operations to an existing cluster Console
+      when: "('plugins' not in console_plugin.resources[0].spec) or ('logging-view-plugin' not in console_plugin.resources[0].spec.plugins)"
+      kubernetes.core.k8s_json_patch:
+        api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+        username: "{{ userName.stdout }}"
+        host: "{{ apiUrl.stdout }}"
+        api_version: operator.openshift.io/v1
+        validate_certs: false
+        kind: Console
+        name: cluster
+        patch:
+          - op: add
+            path: /spec/plugins/-
+            value: logging-view-plugin
 
 - name: Enable Pull Secret Integrations
   when: integrations.insights.enabled 
