@@ -8,3 +8,4 @@ ansible/artefacts/*
 ansible/pullsecret.txt
 *pullsecret*
 *pull-secret*
+.DS_Store
