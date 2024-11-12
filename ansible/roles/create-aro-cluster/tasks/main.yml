@@ -863,7 +863,7 @@
             url: "{{ integrations.gitrepo.repo_url | b64encode }}"
             password: "{{ git_repo_pat['secrets'][0]['secret'] | b64encode }}"
             username: "{{ 'not-used' | b64encode }}"
-            type: "{{ 'git' | b64encode }}"    
+            type: "{{ 'git' | b64encode }}"     
 
     - name: Conditionally create private repo secret
       when: integrations.gitrepo.custom_cert
@@ -883,6 +883,24 @@
           data:
             ca-bundle.crt: "{{ repo_custom_cert['secrets'][0]['secret'] }}"
 
+    # - name: Conditionally create private repo secret
+    #   when: integrations.gitrepo.custom_cert
+    #   kubernetes.core.k8s:
+    #     state: present
+    #     api_key: "{{ openshift_auth_results.openshift_auth.api_key }}"
+    #     username: "{{ userName.stdout }}"
+    #     host: "{{ apiUrl.stdout }}"
+    #     validate_certs: false
+    #     definition:
+    #       apiVersion: v1
+    #       kind: ConfigMap
+    #       metadata:
+    #         name: cluster-root-ca-bundle
+    #         namespace: openshift-gitops
+    #       # type: Opaque
+    #       data:
+    #         ca-bundle.crt: "{{ repo_custom_cert['secrets'][0]['secret'] | b64decode }}"
+
     - name: Conditionally update argocd CRD instance 
       when: integrations.gitrepo.custom_cert
       register: argocd_status
@@ -896,21 +914,134 @@
         host: "{{ apiUrl.stdout }}"
         validate_certs: false
         definition:
-          kind: ArgoCD
           apiVersion: argoproj.io/v1beta1
+          kind: ArgoCD
           metadata:
             name: openshift-gitops
             namespace: openshift-gitops
           spec:
+            resourceHealthChecks: []
+            server:
+              autoscale:
+                enabled: false
+              grpc:
+                ingress:
+                  enabled: false
+              ingress:
+                enabled: false
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+                requests:
+                  cpu: 125m
+                  memory: 128Mi
+              route:
+                enabled: true
+              service:
+                type: ''
+            grafana:
+              enabled: false
+              ingress:
+                enabled: false
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+                requests:
+                  cpu: 250m
+                  memory: 128Mi
+              route:
+                enabled: false
+            monitoring:
+              enabled: false
+            notifications:
+              enabled: false
+            prometheus:
+              enabled: false
+              ingress:
+                enabled: false
+              route:
+                enabled: false
+            sso:
+              dex:
+                openShiftOAuth: true
+                resources:
+                  limits:
+                    cpu: 500m
+                    memory: 256Mi
+                  requests:
+                    cpu: 250m
+                    memory: 128Mi
+              provider: dex
+            applicationSet:
+              resources:
+                limits:
+                  cpu: '2'
+                  memory: 1Gi
+                requests:
+                  cpu: 250m
+                  memory: 512Mi
+              webhookServer:
+                ingress:
+                  enabled: false
+                route:
+                  enabled: false
+            rbac:
+              policy: |
+                g, system:cluster-admins, role:admin
+                g, cluster-admins, role:admin
+              scopes: '[groups]'
             repo:
               volumeMounts:
               - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
                 subPath: ca-bundle.crt
                 name: cluster-root-ca-bundle
-              volumes:
-                - secret:
+              volumes:             
+                - name: cluster-root-ca-bundle
+                  secret:
                     secretName: cluster-root-ca-bundle
-                  name: cluster-root-ca-bundle
+                    optional: true
+              resources:
+                limits:
+                  cpu: '1'
+                  memory: 1Gi
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+            resourceExclusions: |
+              - apiGroups:
+                - tekton.dev
+                clusters:
+                - '*'
+                kinds:
+                - TaskRun
+                - PipelineRun
+            ha:
+              enabled: false
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+                requests:
+                  cpu: 250m
+                  memory: 128Mi
+            redis:
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+                requests:
+                  cpu: 250m
+                  memory: 128Mi
+            controller:
+              resources:
+                limits:
+                  cpu: '2'
+                  memory: 2Gi
+                requests:
+                  cpu: 250m
+                  memory: 1Gi                  
 
     - name: Create External Secrets Operator Read Secret 
       kubernetes.core.k8s:

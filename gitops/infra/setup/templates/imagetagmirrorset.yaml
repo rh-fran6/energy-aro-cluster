@@ -11,6 +11,6 @@ spec:
     - {{ . }}
     {{- end }}
     source: {{ .source }}
-    mirrorSourcePolicy: NeverContactSource
+    mirrorSourcePolicy: AllowContactingSource  #NeverContactSource
   {{- end }}
 {{- end -}}
