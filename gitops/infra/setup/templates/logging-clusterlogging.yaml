@@ -9,7 +9,7 @@ spec:
     type: vector
   logStore:
     lokistack:
-      name: logging-loki
+      name: {{ .Values.integrations.extendedlogging.lokistack }}
     retentionPolicy:
       application:
         maxAge: 30d

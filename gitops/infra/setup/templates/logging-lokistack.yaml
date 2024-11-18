@@ -2,19 +2,19 @@
 apiVersion: loki.grafana.com/v1
 kind: LokiStack
 metadata:
-  name: logging-loki 
+  name: {{ .Values.integrations.extendedlogging.lokistack }}
   namespace: openshift-logging 
 spec:
-  size: 1x.medium
+  size: {{ .Values.integrations.extendedlogging.lokisize }}
   storage:
     schemas:
     - version: v12
       effectiveDate: "2022-06-01"
     secret:
-      name: logging-loki-s3 
-      type: s3 
+      name: {{ .Values.integrations.extendedlogging.secret_name }}
+      type: azure
       credentialMode: 
-  storageClassName: azurefiles-premium
+  storageClassName: {{ if .Values.storageaccount.file.create }}azurefiles-premium{{ else }}managed-premium{{ end }}
   tenants:
     mode: openshift-logging 
 {{- end -}}

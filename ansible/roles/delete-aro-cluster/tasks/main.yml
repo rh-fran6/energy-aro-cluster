@@ -364,6 +364,32 @@
         force_delete_nonempty: true
         state: absent
 
+- name: Remove loki backend storageaccount
+  when: integrations.extendedlogging.enabled
+  block:
+
+    - name: Remove Storage Account
+      azure.azcollection.azure_rm_storageaccount:
+        resource_group: "{{ storageaccount.resourcegroup }}"
+        subscription_id: "{{ installer.subscription_id }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
+        tenant: "{{ installer.tenant_id  }}"
+        name: "{{ integrations.extendedlogging.loki_storageaccount }}"
+        account_type: "{{ integrations.extendedlogging.storageaccount_type }}"
+        kind: "{{ integrations.extendedlogging.kind }}"
+        state: absent
+
+    - name: Remove Resource Group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ storageaccount.resourcegroup }}"
+        location: "{{ storageaccount.location }}"
+        subscription_id: "{{ installer.subscription_id }}"
+        client_id: "{{ installerClientId | default(omit) }}"
+        secret: "{{ installerClientSecret | default(omit) }}"
+        tenant: "{{ installer.tenant_id }}"
+        state: absent
+
 - name: Delete Azure policy for the Cluster Resource Group
   when: cluster.conditionals.create_azure_policy_for_tags
   block:
